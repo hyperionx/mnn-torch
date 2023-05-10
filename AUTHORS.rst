@@ -2,4 +2,4 @@
 Contributors
 ============
 
-* hyperionx <mr_vcv@hotmail.co.uk>
+* Viet Cuong Vu <viet.vu.14@ucl.ac.uk>
