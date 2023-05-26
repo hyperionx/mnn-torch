@@ -3,6 +3,7 @@ import numpy as np
 import scipy.constants as const
 from scipy.io import loadmat
 from scipy.optimize import curve_fit
+from src.mnn_torch.utils import sort_multiple_arrays
 
 
 def load_SiOx_multistate(data_path) -> np.array:
@@ -68,10 +69,12 @@ def compute_PooleFrenkel_current(V, c, d_epsilon):
         ),
     )
 
+    return I
+
 
 def compute_PooleFrenkel_relationship(V, I, voltage_step=0.005, ref_voltage=0.1):
     num_curves = V.shape[0]
-    resistances = np.zeros(num_curves)
+    R = np.zeros(num_curves)
     c = np.zeros(num_curves)
     d_epsilon = np.zeros(num_curves)
     ref_idx = int(ref_voltage / voltage_step)
@@ -81,10 +84,40 @@ def compute_PooleFrenkel_relationship(V, I, voltage_step=0.005, ref_voltage=0.1)
         i = I[idx, :]
 
         r = v[ref_idx] / i[ref_idx]
-        resistances[idx] = r
+        R[idx] = r
+        popt, pcov = curve_fit(compute_PooleFrenkel_current, v, i, p0=[1e-5, 1e-16])
+        c[idx] = popt[0]
+        d_epsilon[idx] = popt[1]
+
+    R, c, d_epsilon, V, I = sort_multiple_arrays(R, c, d_epsilon, V, I)
+    return R, c, d_epsilon, V, I
 
 
 def compute_PooleFrenkel_parameters(
     experimental_data, high_resistance_state=True, ratio=5
 ):
     V, I = load_SiOx_curves(experimental_data)
+    R, c, d_epsilon, _, _ = compute_PooleFrenkel_relationship(V, I)
+    R = torch.tensor(R, dtype=torch.float32)
+    c = torch.tensor(c, dtype=torch.float32)
+    d_epsilon = torch.tensor(d_epsilon, dtype=torch.float32)
+
+    sep_idx = np.searchsorted(
+        R, const.physical_constants["inverse of conductance quantum"][0]
+    )  
+
+    if high_resistance_state:
+        G_off = 1 / R[-1]
+        G_on = G_off * ratio
+        x = torch.log(R)[sep_idx:]
+        y_1 = torch.log(c)[sep_idx:]
+        y_2 = torch.log(d_epsilon)[sep_idx:]
+    else:
+        G_on = 1 / R[0]
+        G_off = G_on / ratio
+        x = torch.log(R)[:sep_idx]
+        y_1 = torch.log(c)[:sep_idx]
+        y_2 = torch.log(d_epsilon)[:sep_idx]
+    
+
+
