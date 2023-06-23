@@ -6,9 +6,10 @@ import math
 class MemristorLinearLayer(nn.Module):
     """ Custom memrisitive layer inherited from torch """
 
-    def __init__(self, size_in, size_out, ideal=True):
+    def __init__(self, size_in, size_out, G_off, G_on, k_V, ideal=True):
         super().__init__()
         self.size_in, self.size_out = size_in, size_out
+        self.G_off, self.G_on, self.k_V = G_off, G_on, k_V
         weights = torch.Tensor(size_out, size_in)
         self.weights = nn.Parameter(
             weights
@@ -33,14 +34,16 @@ class MemristorLinearLayer(nn.Module):
 
         bias = torch.unsqueeze(self.bias, 0)
         combined_weights = torch.cat([self.weights.t(), bias], 0)
-        self.outputs = self.memristive_outputs(inputs, combined_weights)
+        self.outputs = self.memristive_outputs(
+            inputs, combined_weights, self.G_off, self.G_on, self.k_V
+        )
 
         return self.outputs
 
-    def memristive_outputs(self, x, weights):
-        G_off = 0.0007
-        G_on = 0.0035
-        k_V = 0.5
+    def memristive_outputs(self, x, weights, G_off, G_on, k_V=0.5):
+        # G_off = 0.0007
+        # G_on = 0.0035
+        # k_V = 0.5
 
         # input to voltage
         V = k_V * x

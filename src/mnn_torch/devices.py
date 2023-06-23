@@ -3,7 +3,10 @@ import numpy as np
 import scipy.constants as const
 from scipy.io import loadmat
 from scipy.optimize import curve_fit
-from src.mnn_torch.utils import sort_multiple_arrays
+from src.mnn_torch.utils import (
+    sort_multiple_arrays,
+    compute_multivariate_linear_regression_parameters,
+)
 
 
 def load_SiOx_multistate(data_path) -> np.array:
@@ -104,7 +107,7 @@ def compute_PooleFrenkel_parameters(
 
     sep_idx = np.searchsorted(
         R, const.physical_constants["inverse of conductance quantum"][0]
-    )  
+    )
 
     if high_resistance_state:
         G_off = 1 / R[-1]
@@ -118,6 +121,11 @@ def compute_PooleFrenkel_parameters(
         x = torch.log(R)[:sep_idx]
         y_1 = torch.log(c)[:sep_idx]
         y_2 = torch.log(d_epsilon)[:sep_idx]
-    
 
+    (
+        slopes,
+        intercepts,
+        covariance_matrix,
+    ) = compute_multivariate_linear_regression_parameters(x, y_1, y_2)
 
+    return G_off, G_on, slopes, intercepts, covariance_matrix
