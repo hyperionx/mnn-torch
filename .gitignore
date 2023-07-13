@@ -47,6 +47,7 @@ docs/_rst/*
 docs/_build/*
 cover/*
 examples/*
+data/*
 MANIFEST
 
 # Per-project virtualenvs
