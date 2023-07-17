@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.io import loadmat
 
+
 def load_SiOx_multistate(data_path) -> np.array:
     experimental_data = loadmat(data_path)["data"]
     experimental_data = np.flip(experimental_data, axis=2)
@@ -34,4 +35,3 @@ def clean_experimental_data(experimental_data, threshold=0.1):
             accepted_curves.append(idx)
 
     return experimental_data[:, accepted_curves, :]
-

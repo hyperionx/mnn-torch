@@ -8,6 +8,7 @@ import scipy.constants as const
 
 from mnn_torch.devices import load_SiOx_curves
 
+
 def sort_multiple_arrays(key_lst: npt.NDArray, *other_lsts: npt.NDArray):
     """Sorts multiple arrays based on the values of `key_lst`."""
     sorted_idx = np.argsort(key_lst)
@@ -37,11 +38,12 @@ def compute_multivariate_linear_regression_parameters(x, *y):
 
     return slopes, intercepts, covariance_matrix
 
+
 def compute_PooleFrenkel_current(V, c, d_epsilon):
     V = torch.unsqueeze(torch.tensor(V), -1)
     V_abs = torch.abs(V)
     V_sign = torch.sign(V)
-    I, = (
+    (I,) = (
         V_sign
         * c
         * V_abs
@@ -80,7 +82,9 @@ def compute_PooleFrenkel_relationship(V, I, voltage_step=0.005, ref_voltage=0.1)
 
         selected_r = selected_v[ref_idx] / selected_i[ref_idx]
         R[idx] = selected_r
-        popt, pcov = curve_fit(fit_model_parameters, selected_v, selected_i, p0=[1e-5, 1e-16])
+        popt, pcov = curve_fit(
+            fit_model_parameters, selected_v, selected_i, p0=[1e-5, 1e-16]
+        )
         c[idx] = popt[0]
         d_epsilon[idx] = popt[1]
 
@@ -122,10 +126,12 @@ def compute_PooleFrenkel_parameters(
 
     return G_off, G_on, slopes, intercepts, covariance_matrix
 
-def fit_model_parameters(V: npt.NDArray[np.float64], c: float, d_times_perm: float
-    ) -> npt.NDArray[np.float64]:
+
+def fit_model_parameters(
+    V: npt.NDArray[np.float64], c: float, d_times_perm: float
+) -> npt.NDArray[np.float64]:
     V = torch.tensor(V)
     I = compute_PooleFrenkel_current(V, c, d_times_perm)
-    I = I.numpy()[:, 0]    
+    I = I.numpy()[:, 0]
 
     return I

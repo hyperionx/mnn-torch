@@ -6,8 +6,9 @@ import math
 class MemristorLinearLayer(nn.Module):
     """Custom memrisitive layer inherited from torch"""
 
-    def __init__(self, size_in, size_out, G_off, G_on, k_V=0.5, ideal=True):
+    def __init__(self, device, size_in, size_out, G_off, G_on, k_V=0.5, ideal=True):
         super().__init__()
+        self.device = device
         self.size_in, self.size_out = size_in, size_out
         self.G_off, self.G_on, self.k_V = G_off, G_on, k_V
         weights = torch.Tensor(size_out, size_in)
@@ -27,14 +28,12 @@ class MemristorLinearLayer(nn.Module):
             w_times_x = torch.mm(x, self.weights.t())
             return torch.add(w_times_x, self.bias)  # w times x + b
 
-        ones = torch.ones([x.shape[0], 1])
+        ones = torch.ones([x.shape[0], 1]).to(self.device)
         inputs = torch.cat([x, ones], 1)
 
         bias = torch.unsqueeze(self.bias, 0)
         combined_weights = torch.cat([self.weights.t(), bias], 0)
-        self.outputs = self.memristive_outputs(
-            inputs, combined_weights, self.G_off, self.G_on, self.k_V
-        )
+        self.outputs = self.memristive_outputs(inputs, combined_weights)
 
         return self.outputs
 
@@ -49,8 +48,8 @@ class MemristorLinearLayer(nn.Module):
         G_eff = k_G * weights
 
         # Map weights onto conductances.
-        G_pos = torch.max(G_eff, torch.Tensor([0])) + self.G_off
-        G_neg = -torch.max(G_eff, torch.Tensor([0])) + self.G_off
+        G_pos = torch.max(G_eff, torch.Tensor([0]).to(self.device)) + self.G_off
+        G_neg = -torch.max(G_eff, torch.Tensor([0]).to(self.device)) + self.G_off
 
         G = torch.reshape(
             torch.cat((G_pos[:, :, None], G_neg[:, :, None]), -1),

@@ -5,12 +5,21 @@ import snntorch as snn
 from mnn_torch.layers import MemristorLinearLayer
 from mnn_torch.utils import compute_PooleFrenkel_parameters
 
+
 # Define Network
 class MSNN(nn.Module):
     """Basic memrisitive model with spiking neural network"""
 
     def __init__(
-        self, num_inputs, num_hidden, num_outputs, num_steps, beta, experimental_data
+        self,
+        device,
+        num_inputs,
+        num_hidden,
+        num_outputs,
+        num_steps,
+        beta,
+        experimental_data,
+        ideal=True,
     ):
         super().__init__()
 
@@ -25,11 +34,11 @@ class MSNN(nn.Module):
 
         # Initialize layers
         self.fc1 = MemristorLinearLayer(
-            num_inputs, num_hidden, G_off=G_off, G_on=G_on, ideal=True
+            device, num_inputs, num_hidden, G_off=G_off, G_on=G_on, ideal=ideal
         )
         self.lif1 = snn.Leaky(beta=beta)
         self.fc2 = MemristorLinearLayer(
-            num_hidden, num_outputs, G_off=G_off, G_on=G_on, ideal=True
+            device, num_hidden, num_outputs, G_off=G_off, G_on=G_on, ideal=ideal
         )
         self.lif2 = snn.Leaky(beta=beta)
 
