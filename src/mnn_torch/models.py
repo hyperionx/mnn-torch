@@ -3,7 +3,7 @@ import torch.nn as nn
 import snntorch as snn
 
 from mnn_torch.layers import MemristorLinearLayer
-from mnn_torch.utils import compute_PooleFrenkel_parameters
+from mnn_torch.effects import compute_PooleFrenkel_parameters
 
 
 # Define Network

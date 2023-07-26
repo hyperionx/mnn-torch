@@ -74,7 +74,7 @@ def main():
         num_steps,
         beta,
         experimental_data=experimental_data,
-        ideal=False,
+        ideal=True,
     ).to(device)
 
     loss = nn.CrossEntropyLoss()
