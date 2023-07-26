@@ -40,30 +40,18 @@ def compute_multivariate_linear_regression_parameters(x, *y):
 
 
 def compute_PooleFrenkel_current(V, c, d_epsilon):
-    V = torch.unsqueeze(torch.tensor(V), -1)
-    V_abs = torch.abs(V)
-    V_sign = torch.sign(V)
-    (I,) = (
+    # TODO: convert to Torch
+    V_abs = np.absolute(V)
+    V_sign = np.sign(V)
+    I = (
         V_sign
         * c
         * V_abs
-        * torch.exp(
-            torch.div(
-                torch.mul(
-                    const.elementary_charge,
-                    torch.sqrt(
-                        torch.add(
-                            torch.div(
-                                torch.mul(const.elementary_charge, V_abs),
-                                torch.mul(const.pi, d_epsilon),
-                            ),
-                            1e-18,
-                        )
-                    ),
-                ),
-                torch.mul(const.Boltzmann, torch.add(const.zero_Celsius, 20.0)),
-            ),
-        ),
+        * np.exp(
+            const.elementary_charge
+            * np.sqrt(const.elementary_charge * V_abs / (const.pi * d_epsilon) + 1e-18)
+            / (const.Boltzmann * (const.zero_Celsius + 20.0))
+        )
     )
 
     return I
@@ -77,14 +65,12 @@ def compute_PooleFrenkel_relationship(V, I, voltage_step=0.005, ref_voltage=0.1)
     ref_idx = int(ref_voltage / voltage_step)
 
     for idx in range(num_curves):
-        selected_v = V[idx, :]
-        selected_i = I[idx, :]
+        v = V[idx, :]
+        i = I[idx, :]
 
-        selected_r = selected_v[ref_idx] / selected_i[ref_idx]
-        R[idx] = selected_r
-        popt, pcov = curve_fit(
-            fit_model_parameters, selected_v, selected_i, p0=[1e-5, 1e-16]
-        )
+        r = v[ref_idx] / i[ref_idx]
+        R[idx] = r
+        popt, pcov = curve_fit(compute_PooleFrenkel_current, v, i, p0=[1e-5, 1e-16])
         c[idx] = popt[0]
         d_epsilon[idx] = popt[1]
 
@@ -127,11 +113,11 @@ def compute_PooleFrenkel_parameters(
     return G_off, G_on, slopes, intercepts, covariance_matrix
 
 
-def fit_model_parameters(
-    V: npt.NDArray[np.float64], c: float, d_times_perm: float
-) -> npt.NDArray[np.float64]:
-    V = torch.tensor(V)
-    I = compute_PooleFrenkel_current(V, c, d_times_perm)
-    I = I.numpy()[:, 0]
+# def fit_model_parameters(
+#     V: npt.NDArray[np.float64], c: float, d_epsilon: float
+# ) -> npt.NDArray[np.float64]:
+#     V = torch.tensor(V)
+#     I = compute_PooleFrenkel_current(V, c, d_epsilon)
+#     I = I.numpy()[:, 0]
 
-    return I
+#     return I
