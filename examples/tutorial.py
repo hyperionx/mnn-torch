@@ -11,7 +11,7 @@ from mnn_torch.models import MSNN
 
 def main():
     start_time = time.time()
-
+    torch.set_printoptions(threshold=10)
     experimental_data = load_SiOx_multistate("./data/SiO_x-multistate-data.mat")
 
     # dataloader arguments
@@ -59,7 +59,7 @@ def main():
 
     # Network Architecture
     num_inputs = 28 * 28
-    num_hidden = 1000
+    num_hidden = 25
     num_outputs = 10
 
     # Temporal Dynamics
@@ -74,7 +74,7 @@ def main():
         num_steps,
         beta,
         experimental_data=experimental_data,
-        ideal=True,
+        ideal=False,
     ).to(device)
 
     loss = nn.CrossEntropyLoss()

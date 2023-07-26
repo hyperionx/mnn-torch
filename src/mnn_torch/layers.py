@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import numpy as np
 import math
 
 
@@ -18,7 +19,9 @@ class MemristorLinearLayer(nn.Module):
         self.ideal = ideal
 
         # initialize weights and biases
-        nn.init.kaiming_uniform_(self.weights, a=math.sqrt(5))  # weight init
+        stdv = 1 / np.sqrt(self.size_in)
+        # nn.init.kaiming_uniform_(self.weights, a=math.sqrt(5))  # weight init
+        nn.init.normal_(self.weights, mean=0, std=stdv)
         fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.weights)
         bound = 1 / math.sqrt(fan_in)
         nn.init.uniform_(self.bias, -bound, bound)  # bias init

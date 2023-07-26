@@ -48,7 +48,7 @@ def compute_PooleFrenkel_relationship(V, I, voltage_step=0.005, ref_voltage=0.1)
 
 
 def compute_PooleFrenkel_parameters(
-    experimental_data, high_resistance_state=True, ratio=5
+    experimental_data, high_resistance_state=False, ratio=5
 ):
     V, I = load_SiOx_curves(experimental_data)
     R, c, d_epsilon, _, _ = compute_PooleFrenkel_relationship(V, I)
