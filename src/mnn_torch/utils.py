@@ -33,14 +33,3 @@ def compute_multivariate_linear_regression_parameters(x, *y):
     covariance_matrix = torch.cov(residuals_list)
 
     return slopes, intercepts, covariance_matrix
-
-
-
-# def fit_model_parameters(
-#     V: npt.NDArray[np.float64], c: float, d_epsilon: float
-# ) -> npt.NDArray[np.float64]:
-#     V = torch.tensor(V)
-#     I = compute_PooleFrenkel_current(V, c, d_epsilon)
-#     I = I.numpy()[:, 0]
-
-#     return I

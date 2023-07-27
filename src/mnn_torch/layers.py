@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import numpy as np
-import math
 
 
 class MemristorLinearLayer(nn.Module):
@@ -25,9 +24,9 @@ class MemristorLinearLayer(nn.Module):
 
 
     def forward(self, x):
-        if self.ideal:
+        if self.ideal: # w times x + b
             w_times_x = torch.mm(x, self.weights.t())
-            return torch.add(w_times_x, self.bias)  # w times x + b
+            return torch.add(w_times_x, self.bias)
 
         inputs = torch.cat([x, torch.ones([x.shape[0], 1]).to(self.device)], 1)
         bias = torch.unsqueeze(self.bias, 0)
@@ -48,8 +47,8 @@ class MemristorLinearLayer(nn.Module):
         G_eff = k_G * weights_and_bias
 
         # Map weights onto conductances.
-        G_pos = torch.max(G_eff, torch.Tensor([0]).to(self.device)) + self.G_off
-        G_neg = -torch.min(G_eff, torch.Tensor([0]).to(self.device)) + self.G_off
+        G_pos = self.G_off + torch.max(G_eff, torch.Tensor([0]).to(self.device))
+        G_neg = self.G_off - torch.min(G_eff, torch.Tensor([0]).to(self.device))
 
         G = torch.reshape(
             torch.cat((G_pos[:, :, None], G_neg[:, :, None]), -1),
