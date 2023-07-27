@@ -111,7 +111,7 @@ def main():
 
         # Minibatch training loop
         for data, targets in train_batch:
-            data = data.to(device)
+            data = data.to(device) 
             targets = targets.to(device)
 
             # forward pass

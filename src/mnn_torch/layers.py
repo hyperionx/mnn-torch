@@ -20,39 +20,36 @@ class MemristorLinearLayer(nn.Module):
 
         # initialize weights and biases
         stdv = 1 / np.sqrt(self.size_in)
-        # nn.init.kaiming_uniform_(self.weights, a=math.sqrt(5))  # weight init
         nn.init.normal_(self.weights, mean=0, std=stdv)
-        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.weights)
-        bound = 1 / math.sqrt(fan_in)
-        nn.init.uniform_(self.bias, -bound, bound)  # bias init
+        nn.init.constant_(self.bias, 0)
+
 
     def forward(self, x):
         if self.ideal:
             w_times_x = torch.mm(x, self.weights.t())
             return torch.add(w_times_x, self.bias)  # w times x + b
 
-        ones = torch.ones([x.shape[0], 1]).to(self.device)
-        inputs = torch.cat([x, ones], 1)
-
+        inputs = torch.cat([x, torch.ones([x.shape[0], 1]).to(self.device)], 1)
         bias = torch.unsqueeze(self.bias, 0)
-        combined_weights = torch.cat([self.weights.t(), bias], 0)
-        self.outputs = self.memristive_outputs(inputs, combined_weights)
+
+        weights_and_bias = torch.cat([self.weights.t(), bias], 0)
+        self.outputs = self.memristive_outputs(inputs, weights_and_bias)
 
         return self.outputs
 
-    def memristive_outputs(self, x, weights):
+    def memristive_outputs(self, x, weights_and_bias):
         # input to voltage
         V = self.k_V * x
 
-        max_weights = torch.max(torch.abs(weights))
+        max_wb = torch.max(torch.abs(weights_and_bias))
 
         # Conductance scaling factor
-        k_G = (self.G_on - self.G_off) / max_weights
-        G_eff = k_G * weights
+        k_G = (self.G_on - self.G_off) / max_wb
+        G_eff = k_G * weights_and_bias
 
         # Map weights onto conductances.
         G_pos = torch.max(G_eff, torch.Tensor([0]).to(self.device)) + self.G_off
-        G_neg = -torch.max(G_eff, torch.Tensor([0]).to(self.device)) + self.G_off
+        G_neg = -torch.min(G_eff, torch.Tensor([0]).to(self.device)) + self.G_off
 
         G = torch.reshape(
             torch.cat((G_pos[:, :, None], G_neg[:, :, None]), -1),
