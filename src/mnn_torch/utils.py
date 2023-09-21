@@ -4,7 +4,6 @@ import numpy.typing as npt
 
 from scipy.stats import linregress
 
-
 def sort_multiple_arrays(key_lst: npt.NDArray, *other_lsts: npt.NDArray):
     """Sorts multiple arrays based on the values of `key_lst`."""
     sorted_idx = np.argsort(key_lst)
@@ -33,3 +32,18 @@ def compute_multivariate_linear_regression_parameters(x, *y):
     covariance_matrix = torch.cov(residuals_list)
 
     return slopes, intercepts, covariance_matrix
+
+
+def predict_multivariate_linear_regression(x, slopes, intercepts, covariance_matrix):
+    linear_fit = torch.einsum("i...,j->i...j", x, torch.tensor(slopes)) + torch.einsum(
+        "i...,j->i...j", torch.ones(x.shape), torch.tensor(intercepts)
+    )
+
+    linear_deviations = torch.distributions.MultivariateNormal(
+        loc=0.0, scale_tril=torch.linalg.cholesky(covariance_matrix)
+    ).sample(sample_shape=x.shape)
+
+    linear_deviated_fit = linear_fit + linear_deviations
+    deviated_fit = torch.einsum("...i->i...", linear_deviated_fit)
+
+    return deviated_fit

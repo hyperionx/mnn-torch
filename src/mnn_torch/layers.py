@@ -22,9 +22,8 @@ class MemristorLinearLayer(nn.Module):
         nn.init.normal_(self.weights, mean=0, std=stdv)
         nn.init.constant_(self.bias, 0)
 
-
     def forward(self, x):
-        if self.ideal: # w times x + b
+        if self.ideal:  # w times x + b
             w_times_x = torch.mm(x, self.weights.t())
             return torch.add(w_times_x, self.bias)
 
@@ -55,6 +54,7 @@ class MemristorLinearLayer(nn.Module):
             [G_pos.size(dim=0), -1],
         )
 
+        # Compute current
         I = torch.tensordot(V, G, dims=1)
         I_total = I[:, 0::2] - I[:, 1::2]
 

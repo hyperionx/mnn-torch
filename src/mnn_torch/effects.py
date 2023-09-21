@@ -5,7 +5,11 @@ from scipy.optimize import curve_fit
 import scipy.constants as const
 
 from mnn_torch.devices import load_SiOx_curves
-from mnn_torch.utils import sort_multiple_arrays, compute_multivariate_linear_regression_parameters
+from mnn_torch.utils import (
+    sort_multiple_arrays,
+    compute_multivariate_linear_regression_parameters,
+    predict_multivariate_linear_regression,
+)
 
 
 def compute_PooleFrenkel_current(V, c, d_epsilon):
@@ -24,6 +28,23 @@ def compute_PooleFrenkel_current(V, c, d_epsilon):
     )
 
     return I
+
+
+def compute_PooleFrenkel_total_current(V, G, slopes, intercepts, covariance_matrix):
+    R = 1 / G
+    ln_R = torch.log(R)
+
+    fit_data = predict_multivariate_linear_regression(
+        ln_R, slopes, intercepts, covariance_matrix
+    )
+    c = torch.exp(fit_data[0])
+    d_epsilon = torch.exp(fit_data[1])
+    I_ind = compute_PooleFrenkel_current(V, c, d_epsilon)
+    
+    # Add currents along bit lines
+    I = torch.sum(I_ind, dim=1)
+
+    return I, I_ind
 
 
 def compute_PooleFrenkel_relationship(V, I, voltage_step=0.005, ref_voltage=0.1):

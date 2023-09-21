@@ -38,18 +38,6 @@ def main():
         data_path, train=False, download=True, transform=transform
     )
 
-    # train_indices = list(range(len(mnist_train)))
-    # np.random.shuffle(train_indices)
-    # train_sampler = SubsetRandomSampler(train_indices[:5000])
-
-    # val_indices = list(range(len(mnist_test)))
-    # np.random.shuffle(val_indices)
-    # val_sampler = SubsetRandomSampler(val_indices[:1000])
-
-    # # Create data loaders for our datasets; shuffle for training, not for validation
-    # training_loader = torch.utils.data.DataLoader(mnist_train, batch_size=batch_size, sampler=train_sampler)
-    # validation_loader = torch.utils.data.DataLoader(mnist_test, batch_size=batch_size, sampler=val_sampler)
-
     training_loader = torch.utils.data.DataLoader(
         mnist_train, batch_size=batch_size, shuffle=True, drop_last=True
     )
