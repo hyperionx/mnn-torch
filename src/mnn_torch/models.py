@@ -3,7 +3,6 @@ import torch.nn as nn
 import snntorch as snn
 
 from mnn_torch.layers import MemristorLinearLayer
-from mnn_torch.effects import compute_PooleFrenkel_parameters
 
 
 # Define Network
@@ -18,27 +17,20 @@ class MSNN(nn.Module):
         num_outputs,
         num_steps,
         beta,
-        experimental_data,
+        memrisitive_config,
         ideal=True,
     ):
         super().__init__()
 
         self.num_steps = num_steps
-        (
-            G_off,
-            G_on,
-            slopes,
-            intercepts,
-            covariance_matrix,
-        ) = compute_PooleFrenkel_parameters(experimental_data)
 
         # Initialize layers
         self.fc1 = MemristorLinearLayer(
-            device, num_inputs, num_hidden, G_off=G_off, G_on=G_on, ideal=ideal
+            device, num_inputs, num_hidden, memrisitive_config, ideal=ideal
         )
         self.lif1 = snn.Leaky(beta=beta)
         self.fc2 = MemristorLinearLayer(
-            device, num_hidden, num_outputs, G_off=G_off, G_on=G_on, ideal=ideal
+            device, num_hidden, num_outputs, memrisitive_config, ideal=ideal
         )
         self.lif2 = snn.Leaky(beta=beta)
 
@@ -51,7 +43,7 @@ class MSNN(nn.Module):
         spk2_rec = []
         mem2_rec = []
 
-        for step in range(self.num_steps):
+        for _ in range(self.num_steps):
             cur1 = self.fc1(x)
             spk1, mem1 = self.lif1(cur1, mem1)
             cur2 = self.fc2(spk1)

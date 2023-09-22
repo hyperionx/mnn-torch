@@ -2,25 +2,42 @@ import torch
 import torch.nn as nn
 import numpy as np
 
+from mnn_torch.effects import (
+    compute_PooleFrenkel_parameters,
+    compute_PooleFrenkel_total_current,
+)
+
 
 class MemristorLinearLayer(nn.Module):
     """Custom memrisitive layer inherited from torch"""
 
-    def __init__(self, device, size_in, size_out, G_off, G_on, k_V=0.5, ideal=True):
+    def __init__(self, device, size_in, size_out, memrisitive_config, ideal=True):
         super().__init__()
         self.device = device
         self.size_in, self.size_out = size_in, size_out
-        self.G_off, self.G_on, self.k_V = G_off, G_on, k_V
         weights = torch.Tensor(size_out, size_in)
         self.weights = nn.Parameter(weights)
         bias = torch.Tensor(size_out)
         self.bias = nn.Parameter(bias)
         self.ideal = ideal
+        self.memrisitive_config = memrisitive_config
 
         # initialize weights and biases
         stdv = 1 / np.sqrt(self.size_in)
         nn.init.normal_(self.weights, mean=0, std=stdv)
         nn.init.constant_(self.bias, 0)
+
+        if not self.ideal:
+            (
+                self.G_off,
+                self.G_on,
+                self.slopes,
+                self.intercepts,
+                self.covariance_matrix,
+            ) = compute_PooleFrenkel_parameters(
+                self.memrisitive_config["experimental_data"]
+            )
+            self.k_V = self.memrisitive_config["k_V"]
 
     def forward(self, x):
         if self.ideal:  # w times x + b
@@ -54,11 +71,23 @@ class MemristorLinearLayer(nn.Module):
             [G_pos.size(dim=0), -1],
         )
 
-        # Compute current
-        I = torch.tensordot(V, G, dims=1)
+        if not self.ideal:
+            I, I_ind = compute_PooleFrenkel_total_current(
+                V,
+                G,
+                self.slopes.to(self.device),
+                self.intercepts.to(self.device),
+                self.covariance_matrix.to(self.device),
+            )
+
+        else:
+            # I = torch.tensordot(V, G, dims=1)
+            I_ind = torch.unsqueeze(V, -1) * torch.unsqueeze(G, 0)
+            I = torch.sum(I_ind, dim=1)
+
         I_total = I[:, 0::2] - I[:, 1::2]
 
         k_I = self.k_V * k_G
-        y = I_total / k_I
+        y = torch.tensor(I_total).to(self.device) / k_I
 
         return y

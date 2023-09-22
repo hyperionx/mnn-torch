@@ -6,6 +6,7 @@ import torchvision.datasets as datasets
 from torch.utils.data.sampler import SubsetRandomSampler
 
 from mnn_torch.devices import load_SiOx_multistate
+# from mnn_torch.effects import compute_PooleFrenkel_parameters
 from mnn_torch.models import MSNN
 
 
@@ -13,6 +14,12 @@ def main():
     start_time = time.time()
     torch.set_printoptions(threshold=10)
     experimental_data = load_SiOx_multistate("./data/SiO_x-multistate-data.mat")
+
+    PF_config = {
+                 "experimental_data": experimental_data,
+                 "k_V": 0.5,
+                 "disturb_conductance": False,
+                 }
 
     # dataloader arguments
     batch_size = 128
@@ -61,7 +68,7 @@ def main():
         num_outputs,
         num_steps,
         beta,
-        experimental_data=experimental_data,
+        memrisitive_config=PF_config,
         ideal=False,
     ).to(device)
 

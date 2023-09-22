@@ -14,6 +14,12 @@ from mnn_torch.utils import (
 
 def compute_PooleFrenkel_current(V, c, d_epsilon):
     # TODO: convert to Torch
+    if torch.is_tensor(V):
+        V = V.cpu().detach().numpy()
+        V = np.expand_dims(V, axis=-1)
+        c = c.cpu().detach().numpy()
+        d_epsilon = d_epsilon.cpu().detach().numpy()
+
     V_abs = np.absolute(V)
     V_sign = np.sign(V)
     I = (
@@ -40,9 +46,9 @@ def compute_PooleFrenkel_total_current(V, G, slopes, intercepts, covariance_matr
     c = torch.exp(fit_data[0])
     d_epsilon = torch.exp(fit_data[1])
     I_ind = compute_PooleFrenkel_current(V, c, d_epsilon)
-    
+
     # Add currents along bit lines
-    I = torch.sum(I_ind, dim=1)
+    I = np.sum(I_ind, axis=1)
 
     return I, I_ind
 
