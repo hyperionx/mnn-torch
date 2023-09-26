@@ -15,12 +15,6 @@ def main():
     torch.set_printoptions(threshold=10)
     experimental_data = load_SiOx_multistate("./data/SiO_x-multistate-data.mat")
 
-    PF_config = {
-                 "experimental_data": experimental_data,
-                 "k_V": 0.5,
-                 "disturb_conductance": False,
-                 }
-
     # dataloader arguments
     batch_size = 128
     data_path = "./data"
@@ -61,6 +55,15 @@ def main():
     num_steps = 25
     beta = 0.95
 
+    # Memrisitive Configuration
+    PF_config = {
+                 "experimental_data": experimental_data,
+                 "k_V": 0.5,
+                 "ideal": False,
+                 "disturb_conductance": False,
+                 }
+
+
     net = MSNN(
         device,
         num_inputs,
@@ -69,7 +72,6 @@ def main():
         num_steps,
         beta,
         memrisitive_config=PF_config,
-        ideal=False,
     ).to(device)
 
     loss = nn.CrossEntropyLoss()

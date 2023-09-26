@@ -18,7 +18,6 @@ class MSNN(nn.Module):
         num_steps,
         beta,
         memrisitive_config,
-        ideal=True,
     ):
         super().__init__()
 
@@ -26,11 +25,11 @@ class MSNN(nn.Module):
 
         # Initialize layers
         self.fc1 = MemristorLinearLayer(
-            device, num_inputs, num_hidden, memrisitive_config, ideal=ideal
+            device, num_inputs, num_hidden, memrisitive_config
         )
         self.lif1 = snn.Leaky(beta=beta)
         self.fc2 = MemristorLinearLayer(
-            device, num_hidden, num_outputs, memrisitive_config, ideal=ideal
+            device, num_hidden, num_outputs, memrisitive_config
         )
         self.lif2 = snn.Leaky(beta=beta)
 

@@ -11,7 +11,7 @@ from mnn_torch.effects import (
 class MemristorLinearLayer(nn.Module):
     """Custom memrisitive layer inherited from torch"""
 
-    def __init__(self, device, size_in, size_out, memrisitive_config, ideal=True):
+    def __init__(self, device, size_in, size_out, memrisitive_config):
         super().__init__()
         self.device = device
         self.size_in, self.size_out = size_in, size_out
@@ -19,7 +19,8 @@ class MemristorLinearLayer(nn.Module):
         self.weights = nn.Parameter(weights)
         bias = torch.Tensor(size_out)
         self.bias = nn.Parameter(bias)
-        self.ideal = ideal
+
+        self.ideal = memrisitive_config["ideal"]
         self.memrisitive_config = memrisitive_config
 
         # initialize weights and biases
@@ -31,9 +32,9 @@ class MemristorLinearLayer(nn.Module):
             (
                 self.G_off,
                 self.G_on,
-                self.slopes,
-                self.intercepts,
-                self.covariance_matrix,
+                # self.slopes,
+                # self.intercepts,
+                # self.covariance_matrix,
             ) = compute_PooleFrenkel_parameters(
                 self.memrisitive_config["experimental_data"]
             )
@@ -60,6 +61,7 @@ class MemristorLinearLayer(nn.Module):
 
         # Conductance scaling factor
         k_G = (self.G_on - self.G_off) / max_wb
+        k_I = self.k_V * k_G
         G_eff = k_G * weights_and_bias
 
         # Map weights onto conductances.
@@ -71,23 +73,21 @@ class MemristorLinearLayer(nn.Module):
             [G_pos.size(dim=0), -1],
         )
 
-        if not self.ideal:
-            I, I_ind = compute_PooleFrenkel_total_current(
-                V,
-                G,
-                self.slopes.to(self.device),
-                self.intercepts.to(self.device),
-                self.covariance_matrix.to(self.device),
-            )
+        # I, I_ind = compute_PooleFrenkel_total_current(
+        #     V,
+        #     G,
+        #     self.slopes.to(self.device),
+        #     self.intercepts.to(self.device),
+        #     self.covariance_matrix.to(self.device),
+        # )
 
-        else:
-            # I = torch.tensordot(V, G, dims=1)
-            I_ind = torch.unsqueeze(V, -1) * torch.unsqueeze(G, 0)
-            I = torch.sum(I_ind, dim=1)
+        I_ind = torch.unsqueeze(V, -1) * torch.unsqueeze(G, 0)
+        I = torch.sum(I_ind, dim=1)
 
         I_total = I[:, 0::2] - I[:, 1::2]
 
-        k_I = self.k_V * k_G
-        y = torch.tensor(I_total).to(self.device) / k_I
+        # y = I_total / k_I.cpu().detach().numpy()
+        # return torch.Tensor(y).to(self.device)
 
+        y = I_total / k_I
         return y
