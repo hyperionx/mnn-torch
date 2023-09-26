@@ -12,6 +12,11 @@ from mnn_torch.utils import (
 )
 
 
+def disturb_conductance(G, fixed_conductance, true_probability):
+    mask = torch.rand(G.shape) < true_probability
+    G = torch.where(mask, fixed_conductance, G)
+
+
 def compute_PooleFrenkel_current(V, c, d_epsilon):
     # TODO: convert to Torch
     if torch.is_tensor(V):
