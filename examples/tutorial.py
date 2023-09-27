@@ -6,7 +6,6 @@ import torchvision.datasets as datasets
 from torch.utils.data.sampler import SubsetRandomSampler
 
 from mnn_torch.devices import load_SiOx_multistate
-# from mnn_torch.effects import compute_PooleFrenkel_parameters
 from mnn_torch.models import MSNN
 
 

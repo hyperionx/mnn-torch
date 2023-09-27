@@ -19,11 +19,11 @@ def disturb_conductance(G, fixed_conductance, true_probability):
 
 def compute_PooleFrenkel_current(V, c, d_epsilon):
     # TODO: convert to Torch
-    if torch.is_tensor(V):
-        V = V.cpu().detach().numpy()
-        V = np.expand_dims(V, axis=-1)
-        c = c.cpu().detach().numpy()
-        d_epsilon = d_epsilon.cpu().detach().numpy()
+    # if torch.is_tensor(V):
+    #     V = V.cpu().detach().numpy()
+    #     V = np.expand_dims(V, axis=-1)
+    #     c = c.cpu().detach().numpy()
+    #     d_epsilon = d_epsilon.cpu().detach().numpy()
 
     V_abs = np.absolute(V)
     V_sign = np.sign(V)
@@ -88,19 +88,27 @@ def compute_PooleFrenkel_parameters(
     c = torch.tensor(c, dtype=torch.float32)
     d_epsilon = torch.tensor(d_epsilon, dtype=torch.float32)
 
+
+    if high_resistance_state:
+        G_off = 1 / R[-1]
+        G_on = G_off * ratio
+    else:
+        G_on = 1 / R[0]
+        G_off = G_on / ratio
+
+    return G_off, G_on, R, c, d_epsilon
+
+
+def compute_PooleFrenkel_regression_parameters(R, c, d_epsilon, high_resistance_state=False):
     sep_idx = np.searchsorted(
         R, const.physical_constants["inverse of conductance quantum"][0]
     )
 
     if high_resistance_state:
-        G_off = 1 / R[-1]
-        G_on = G_off * ratio
         x = torch.log(R)[sep_idx:]
         y_1 = torch.log(c)[sep_idx:]
         y_2 = torch.log(d_epsilon)[sep_idx:]
     else:
-        G_on = 1 / R[0]
-        G_off = G_on / ratio
         x = torch.log(R)[:sep_idx]
         y_1 = torch.log(c)[:sep_idx]
         y_2 = torch.log(d_epsilon)[:sep_idx]
@@ -111,4 +119,4 @@ def compute_PooleFrenkel_parameters(
         covariance_matrix,
     ) = compute_multivariate_linear_regression_parameters(x, y_1, y_2)
 
-    return G_off, G_on, slopes, intercepts, covariance_matrix
+    return slopes, intercepts, covariance_matrix

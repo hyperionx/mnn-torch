@@ -32,9 +32,9 @@ class MemristorLinearLayer(nn.Module):
             (
                 self.G_off,
                 self.G_on,
-                self.slopes,
-                self.intercepts,
-                self.covariance_matrix,
+                self.R,
+                self.c,
+                self.d_epsilon
             ) = compute_PooleFrenkel_parameters(
                 self.memrisitive_config["experimental_data"]
             )
