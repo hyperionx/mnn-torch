@@ -12,18 +12,15 @@ from mnn_torch.utils import (
 )
 
 
-def disturb_conductance(G, fixed_conductance, true_probability):
-    mask = torch.rand(G.shape) < true_probability
+def disturb_conductance(G, fixed_conductance, true_probability=0.5):
+    mask = torch.rand(G.shape).to(G.device) < true_probability
     G = torch.where(mask, fixed_conductance, G)
+
+    return G
 
 
 def compute_PooleFrenkel_current(V, c, d_epsilon):
     # TODO: convert to Torch
-    # if torch.is_tensor(V):
-    #     V = V.cpu().detach().numpy()
-    #     V = np.expand_dims(V, axis=-1)
-    #     c = c.cpu().detach().numpy()
-    #     d_epsilon = d_epsilon.cpu().detach().numpy()
 
     V_abs = np.absolute(V)
     V_sign = np.sign(V)
@@ -88,7 +85,6 @@ def compute_PooleFrenkel_parameters(
     c = torch.tensor(c, dtype=torch.float32)
     d_epsilon = torch.tensor(d_epsilon, dtype=torch.float32)
 
-
     if high_resistance_state:
         G_off = 1 / R[-1]
         G_on = G_off * ratio
@@ -99,7 +95,9 @@ def compute_PooleFrenkel_parameters(
     return G_off, G_on, R, c, d_epsilon
 
 
-def compute_PooleFrenkel_regression_parameters(R, c, d_epsilon, high_resistance_state=False):
+def compute_PooleFrenkel_regression_parameters(
+    R, c, d_epsilon, high_resistance_state=False
+):
     sep_idx = np.searchsorted(
         R, const.physical_constants["inverse of conductance quantum"][0]
     )

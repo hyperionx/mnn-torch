@@ -4,7 +4,7 @@ import numpy as np
 
 from mnn_torch.effects import (
     compute_PooleFrenkel_parameters,
-    compute_PooleFrenkel_total_current,
+    disturb_conductance,
 )
 
 
@@ -21,6 +21,7 @@ class MemristorLinearLayer(nn.Module):
         self.bias = nn.Parameter(bias)
 
         self.ideal = memrisitive_config["ideal"]
+        self.disturb_conductance = memrisitive_config["disturb_conductance"]
         self.memrisitive_config = memrisitive_config
 
         # initialize weights and biases
@@ -34,7 +35,7 @@ class MemristorLinearLayer(nn.Module):
                 self.G_on,
                 self.R,
                 self.c,
-                self.d_epsilon
+                self.d_epsilon,
             ) = compute_PooleFrenkel_parameters(
                 self.memrisitive_config["experimental_data"]
             )
@@ -73,21 +74,13 @@ class MemristorLinearLayer(nn.Module):
             [G_pos.size(dim=0), -1],
         )
 
-        # I, I_ind = compute_PooleFrenkel_total_current(
-        #     V,
-        #     G,
-        #     self.slopes.to(self.device),
-        #     self.intercepts.to(self.device),
-        #     self.covariance_matrix.to(self.device),
-        # )
+        if self.disturb_conductance:
+            G = disturb_conductance(G, self.G_on, true_probability=0.5)
 
         I_ind = torch.unsqueeze(V, -1) * torch.unsqueeze(G, 0)
         I = torch.sum(I_ind, dim=1)
 
         I_total = I[:, 0::2] - I[:, 1::2]
-
-        # y = I_total / k_I.cpu().detach().numpy()
-        # return torch.Tensor(y).to(self.device)
 
         y = I_total / k_I
         return y

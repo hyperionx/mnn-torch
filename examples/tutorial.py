@@ -59,7 +59,7 @@ def main():
                  "experimental_data": experimental_data,
                  "k_V": 0.5,
                  "ideal": False,
-                 "disturb_conductance": False,
+                 "disturb_conductance": True,
                  }
 
 
