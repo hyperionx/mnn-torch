@@ -4,7 +4,7 @@ import numpy as np
 
 from mnn_torch.effects import (
     compute_PooleFrenkel_parameters,
-    disturb_conductance,
+    disturb_conductance_fixed,
 )
 
 
@@ -75,7 +75,7 @@ class MemristorLinearLayer(nn.Module):
         )
 
         if self.disturb_conductance:
-            G = disturb_conductance(G, self.G_on, true_probability=0.5)
+            G = disturb_conductance_fixed(G, self.G_on, true_probability=0.5)
 
         I_ind = torch.unsqueeze(V, -1) * torch.unsqueeze(G, 0)
         I = torch.sum(I_ind, dim=1)

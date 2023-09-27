@@ -12,10 +12,30 @@ from mnn_torch.utils import (
 )
 
 
-def disturb_conductance(G, fixed_conductance, true_probability=0.5):
+def disturb_conductance_fixed(G, fixed_conductance, true_probability=0.5):
     mask = torch.rand(G.shape).to(G.device) < true_probability
     G = torch.where(mask, fixed_conductance, G)
 
+    return G
+
+
+def disturb_conductance_device(G, G_on, G_off, R_on_log_std, R_off_log_std):
+    R = 1 / G
+    R_on = 1 / G_on
+    R_off = 1 / G_off
+
+    log_std_ref = [R_on_log_std, R_off_log_std]
+    log_std = torch.from_numpy(
+        np.interp(R.numpy(), (R_on.numpy(), R_off.numpy()), log_std_ref.numpy())
+    )
+    R_squared = torch.pow(R, 2)
+    log_var = torch.pow(log_std, 2)
+
+    R_var = R_squared * (torch.exp(log_var) - 1)
+    log_mu = torch.log(R_squared / (torch.sqrt(R_squared + R_var)))
+    R = torch.distributions.log_normal.LogNormal(log_mu, log_std).sample()
+
+    G = 1 / R
     return G
 
 
