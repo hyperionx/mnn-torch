@@ -55,17 +55,32 @@ class MSNN(nn.Module):
 
 
 class MSCNN(nn.Module):
-    def __init__(self, beta, spike_grad, batch_size):
+    def __init__(
+        self,
+        device,
+        beta,
+        spike_grad,
+        batch_size,
+        num_kernels,
+        num_conv1,
+        num_conv2,
+        max_pooling,
+        num_hidden,
+        num_outputs,
+        memrisitive_config,
+    ):
         super().__init__()
 
         self.batch_size = batch_size
+        self.max_pooling = max_pooling
 
         # Initialize layers
-        self.conv1 = nn.Conv2d(1, 12, 5)
+        self.conv1 = nn.Conv2d(1, num_conv1, num_kernels)
         self.lif1 = snn.Leaky(beta=beta, spike_grad=spike_grad)
-        self.conv2 = nn.Conv2d(12, 64, 5)
+        self.conv2 = nn.Conv2d(num_conv1, num_conv2, num_kernels)
         self.lif2 = snn.Leaky(beta=beta, spike_grad=spike_grad)
-        self.fc1 = nn.Linear(64 * 4 * 4, 10)
+        # self.fc1 = nn.Linear(num_hidden, num_outputs)
+        self.fc1 = MemristorLinearLayer(device, num_hidden, num_outputs, memrisitive_config)
         self.lif3 = snn.Leaky(beta=beta, spike_grad=spike_grad)
 
     def forward(self, x):
@@ -74,10 +89,10 @@ class MSCNN(nn.Module):
         mem2 = self.lif2.init_leaky()
         mem3 = self.lif3.init_leaky()
 
-        cur1 = F.max_pool2d(self.conv1(x), 2)
+        cur1 = F.max_pool2d(self.conv1(x), self.max_pooling)
         spk1, mem1 = self.lif1(cur1, mem1)
 
-        cur2 = F.max_pool2d(self.conv2(spk1), 2)
+        cur2 = F.max_pool2d(self.conv2(spk1), self.max_pooling)
         spk2, mem2 = self.lif2(cur2, mem2)
 
         cur3 = self.fc1(spk2.view(self.batch_size, -1))
