@@ -51,7 +51,7 @@ def main():
 
     # Network Architecture
     num_inputs = 28 * 28
-    num_hidden = 25
+    num_hidden = 100
     num_outputs = 10
 
     # Temporal Dynamics
@@ -187,7 +187,7 @@ def main2():
 
     spike_grad = surrogate.fast_sigmoid(slope=25)
     beta = 0.5
-    num_steps = 50
+    num_steps = 25
 
     # Network Architecture
     num_kernels = 5
