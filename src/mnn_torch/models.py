@@ -75,9 +75,9 @@ class MSCNN(nn.Module):
         self.max_pooling = max_pooling
 
         # Initialize layers
-        self.conv1 = nn.Conv2d(1, num_conv1, num_kernels)
+        self.conv1 = nn.Conv2d(1, num_conv1, num_kernels, device=device)
         self.lif1 = snn.Leaky(beta=beta, spike_grad=spike_grad)
-        self.conv2 = nn.Conv2d(num_conv1, num_conv2, num_kernels)
+        self.conv2 = nn.Conv2d(num_conv1, num_conv2, num_kernels, device=device)
         self.lif2 = snn.Leaky(beta=beta, spike_grad=spike_grad)
         # self.fc1 = nn.Linear(num_hidden, num_outputs)
         self.fc1 = MemristorLinearLayer(device, num_hidden, num_outputs, memrisitive_config)

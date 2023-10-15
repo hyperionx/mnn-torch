@@ -43,8 +43,8 @@ class MemristorLinearLayer(nn.Module):
 
     def forward(self, x):
         if self.ideal:  # w times x + b
-            w_times_x = torch.mm(x, self.weights.t())
-            return torch.add(w_times_x, self.bias)
+            w_times_x = torch.mm(x, self.weights.t().to(self.device))
+            return torch.add(w_times_x, self.bias.to(self.device))
 
         inputs = torch.cat([x, torch.ones([x.shape[0], 1]).to(self.device)], 1)
         bias = torch.unsqueeze(self.bias, 0)

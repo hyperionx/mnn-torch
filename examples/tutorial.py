@@ -283,4 +283,4 @@ def main2():
             counter += 1
 
 if __name__ == "__main__":
-    main2()
+    main()
