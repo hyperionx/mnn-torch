@@ -6,7 +6,7 @@ import torchvision.datasets as datasets
 from torch.utils.data.sampler import SubsetRandomSampler
 
 from mnn_torch.devices import load_SiOx_multistate
-from mnn_torch.models import MSNN, MSCNN
+from mnn_torch.models import MSNN, MCSNN, CSNN, SNN
 from snntorch import surrogate
 from snntorch import backprop
 from snntorch import functional as SF
@@ -63,7 +63,7 @@ def main():
                  "experimental_data": experimental_data,
                  "k_V": 0.5,
                  "ideal": False,
-                 "disturb_conductance": True,
+                 "disturb_conductance": False,
                  }
 
 
@@ -83,17 +83,20 @@ def main():
     num_epochs = 1
     loss_hist = []
     test_loss_hist = []
+    test_acc_hist = []
     counter = 0
 
     def print_batch_accuracy(data, targets, train=False):
         output, _ = net(data.view(batch_size, -1))
         _, idx = output.sum(dim=0).max(1)
         acc = np.mean((targets == idx).detach().cpu().numpy())
+        test_acc_hist.append(acc.item())
 
         if train:
             print(f"Train set accuracy for a single minibatch: {acc*100:.2f}%")
         else:
             print(f"Test set accuracy for a single minibatch: {acc*100:.2f}%")
+            test_acc_hist.append(acc.item())
 
     def train_printer():
         print(f"--- {time.time() - start_time} seconds ---")
@@ -159,6 +162,7 @@ def main2():
     # dataloader arguments
     batch_size = 128
     data_path = "C:\\Users\\Mr_VC\\git\\mnn-torch\\data"
+    experimental_data = load_SiOx_multistate("./data/SiO_x-multistate-data.mat")
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
     # Define a transform
@@ -198,13 +202,13 @@ def main2():
     num_outputs = 10
 
     memrisitive_config = {
-                    # "experimental_data": experimental_data,
-                    # "k_V": 0.5,
-                    "ideal": True,
-                    "disturb_conductance": False,
+                    "experimental_data": experimental_data,
+                    "k_V": 0.5,
+                    "ideal": False,
+                    "disturb_conductance": True,
                     }
 
-    net = MSCNN(device=device, beta=beta, spike_grad=spike_grad, batch_size=batch_size,
+    net = MCSNN(device=device, beta=beta, spike_grad=spike_grad, batch_size=batch_size,
                 num_kernels=num_kernels, num_conv1=num_conv1, num_conv2=num_conv2,
                 max_pooling=max_pooling, num_hidden=num_hidden, num_outputs=num_outputs,
                 memrisitive_config=memrisitive_config)
@@ -282,5 +286,7 @@ def main2():
 
             counter += 1
 
+    pass
+
 if __name__ == "__main__":
-    main()
+    main2()
