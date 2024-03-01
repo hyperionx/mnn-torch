@@ -13,6 +13,7 @@ from snntorch import functional as SF
 from snntorch import utils
 from snntorch import spikeplot as splt
 
+
 def main():
     start_time = time.time()
     torch.set_printoptions(threshold=10)
@@ -60,12 +61,11 @@ def main():
 
     # Memrisitive Configuration
     PF_config = {
-                 "experimental_data": experimental_data,
-                 "k_V": 0.5,
-                 "ideal": False,
-                 "disturb_conductance": False,
-                 }
-
+        "experimental_data": experimental_data,
+        "k_V": 0.5,
+        "ideal": False,
+        "disturb_conductance": False,
+    }
 
     net = MSNN(
         device,
@@ -114,7 +114,7 @@ def main():
 
         # Minibatch training loop
         for data, targets in train_batch:
-            data = data.to(device) 
+            data = data.to(device)
             targets = targets.to(device)
 
             # forward pass
@@ -157,6 +157,7 @@ def main():
                 iter_counter += 1
 
     pass
+
 
 def main2():
     # dataloader arguments
@@ -202,16 +203,25 @@ def main2():
     num_outputs = 10
 
     memrisitive_config = {
-                    "experimental_data": experimental_data,
-                    "k_V": 0.5,
-                    "ideal": False,
-                    "disturb_conductance": True,
-                    }
+        "experimental_data": experimental_data,
+        "k_V": 0.5,
+        "ideal": False,
+        "disturb_conductance": True,
+    }
 
-    net = MCSNN(device=device, beta=beta, spike_grad=spike_grad, batch_size=batch_size,
-                num_kernels=num_kernels, num_conv1=num_conv1, num_conv2=num_conv2,
-                max_pooling=max_pooling, num_hidden=num_hidden, num_outputs=num_outputs,
-                memrisitive_config=memrisitive_config)
+    net = MCSNN(
+        device=device,
+        beta=beta,
+        spike_grad=spike_grad,
+        batch_size=batch_size,
+        num_kernels=num_kernels,
+        num_conv1=num_conv1,
+        num_conv2=num_conv2,
+        max_pooling=max_pooling,
+        num_hidden=num_hidden,
+        num_outputs=num_outputs,
+        memrisitive_config=memrisitive_config,
+    )
 
     loss_fn = SF.ce_rate_loss()
 
@@ -226,7 +236,7 @@ def main2():
             mem_rec.append(mem_out)
 
         return torch.stack(spk_rec), torch.stack(mem_rec)
-    
+
     def batch_accuracy(train_loader, net, num_steps):
         with torch.no_grad():
             total = 0
@@ -242,8 +252,7 @@ def main2():
                 acc += SF.accuracy_rate(spk_rec, targets) * spk_rec.size(1)
                 total += spk_rec.size(1)
 
-        return acc/total
-    
+        return acc / total
 
     optimizer = torch.optim.Adam(net.parameters(), lr=1e-2, betas=(0.9, 0.999))
     num_epochs = 1
@@ -287,6 +296,7 @@ def main2():
             counter += 1
 
     pass
+
 
 if __name__ == "__main__":
     main2()

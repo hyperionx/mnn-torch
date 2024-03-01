@@ -8,17 +8,10 @@ from mnn_torch.layers import MemristorLinearLayer
 
 # Define Network
 
-class SNN(nn.Module):
-    """Basic memrisitive model with spiking neural network"""
 
+class SNN(nn.Module):
     def __init__(
-        self,
-        device,
-        num_inputs,
-        num_hidden,
-        num_outputs,
-        num_steps,
-        beta,
+        self, device, num_inputs, num_hidden, num_outputs, num_steps, beta,
     ):
         super().__init__()
 
@@ -62,20 +55,16 @@ class MSNN(nn.Module):
         num_steps,
         beta,
         memrisitive_config,
-
-
     ):
         super().__init__()
 
         self.num_steps = num_steps
 
         # Initialize layers
-        # self.fc1 = nn.Linear(num_inputs, num_hidden, device=device)
         self.fc1 = MemristorLinearLayer(
             device, num_inputs, num_hidden, memrisitive_config
         )
         self.lif1 = snn.Leaky(beta=beta)
-        # self.fc2 = nn.Linear(num_hidden, num_outputs, device=device)
         self.fc2 = MemristorLinearLayer(
             device, num_hidden, num_outputs, memrisitive_config
         )
@@ -99,6 +88,7 @@ class MSNN(nn.Module):
             mem2_rec.append(mem2)
 
         return torch.stack(spk2_rec, dim=0), torch.stack(mem2_rec, dim=0)
+
 
 class CSNN(nn.Module):
     def __init__(
@@ -170,7 +160,6 @@ class MCSNN(nn.Module):
         self.lif1 = snn.Leaky(beta=beta, spike_grad=spike_grad)
         self.conv2 = nn.Conv2d(num_conv1, num_conv2, num_kernels, device=device)
         self.lif2 = snn.Leaky(beta=beta, spike_grad=spike_grad)
-        # self.fc1 = nn.Linear(num_hidden, num_outputs, device=device)
         self.fc1 = MemristorLinearLayer(
             device, num_hidden, num_outputs, memrisitive_config
         )

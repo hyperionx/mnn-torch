@@ -66,8 +66,12 @@ class MemristorLinearLayer(nn.Module):
         G_eff = k_G * weights_and_bias
 
         # Map weights onto conductances.
-        G_pos = self.G_off + torch.max(G_eff.to(self.device), torch.Tensor([0]).to(self.device))
-        G_neg = self.G_off - torch.min(G_eff.to(self.device), torch.Tensor([0]).to(self.device))
+        G_pos = self.G_off + torch.max(
+            G_eff.to(self.device), torch.Tensor([0]).to(self.device)
+        )
+        G_neg = self.G_off - torch.min(
+            G_eff.to(self.device), torch.Tensor([0]).to(self.device)
+        )
 
         G = torch.reshape(
             torch.cat((G_pos[:, :, None], G_neg[:, :, None]), -1),
