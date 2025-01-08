@@ -7,30 +7,19 @@ from mnn_torch.layers import MemristorLinearLayer
 
 
 # Define Network
-
-
 class SNN(nn.Module):
-    def __init__(
-        self, device, num_inputs, num_hidden, num_outputs, num_steps, beta,
-    ):
+    def __init__(self, device, num_inputs, num_hidden, num_outputs, num_steps, beta):
         super().__init__()
-
         self.num_steps = num_steps
-
-        # Initialize layers
         self.fc1 = nn.Linear(num_inputs, num_hidden, device=device)
         self.lif1 = snn.Leaky(beta=beta)
         self.fc2 = nn.Linear(num_hidden, num_outputs, device=device)
         self.lif2 = snn.Leaky(beta=beta)
 
     def forward(self, x):
-        # Initialize hidden states at t=0
         mem1 = self.lif1.init_leaky()
         mem2 = self.lif2.init_leaky()
-
-        # Record the final layer
-        spk2_rec = []
-        mem2_rec = []
+        spk2_rec, mem2_rec = [], []
 
         for _ in range(self.num_steps):
             cur1 = self.fc1(x)
@@ -44,8 +33,6 @@ class SNN(nn.Module):
 
 
 class MSNN(nn.Module):
-    """Basic memrisitive model with spiking neural network"""
-
     def __init__(
         self,
         device,
@@ -57,27 +44,16 @@ class MSNN(nn.Module):
         memrisitive_config,
     ):
         super().__init__()
-
         self.num_steps = num_steps
-
-        # Initialize layers
-        self.fc1 = MemristorLinearLayer(
-            device, num_inputs, num_hidden, memrisitive_config
-        )
+        self.fc1 = MemristorLinearLayer(device, num_inputs, num_hidden, memrisitive_config)
         self.lif1 = snn.Leaky(beta=beta)
-        self.fc2 = MemristorLinearLayer(
-            device, num_hidden, num_outputs, memrisitive_config
-        )
+        self.fc2 = MemristorLinearLayer(device, num_hidden, num_outputs, memrisitive_config)
         self.lif2 = snn.Leaky(beta=beta)
 
     def forward(self, x):
-        # Initialize hidden states at t=0
         mem1 = self.lif1.init_leaky()
         mem2 = self.lif2.init_leaky()
-
-        # Record the final layer
-        spk2_rec = []
-        mem2_rec = []
+        spk2_rec, mem2_rec = [], []
 
         for _ in range(self.num_steps):
             cur1 = self.fc1(x)

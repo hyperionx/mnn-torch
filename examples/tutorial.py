@@ -17,32 +17,31 @@ from snntorch import spikeplot as splt
 def main():
     start_time = time.time()
     torch.set_printoptions(threshold=10)
+
+    # Load experimental data
     experimental_data = load_SiOx_multistate("./data/SiO_x-multistate-data.mat")
 
-    # dataloader arguments
+    # Dataloader arguments
     batch_size = 128
     data_path = "./data"
 
+    # Set device
     dtype = torch.float
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
     # Define a transform
-    transform = transforms.Compose(
-        [
-            transforms.Resize((28, 28)),
-            transforms.Grayscale(),
-            transforms.ToTensor(),
-            transforms.Normalize((0,), (1,)),
-        ]
-    )
+    transform = transforms.Compose([
+        transforms.Resize((28, 28)),
+        transforms.Grayscale(),
+        transforms.ToTensor(),
+        transforms.Normalize((0,), (1,)),
+    ])
 
-    mnist_train = datasets.MNIST(
-        data_path, train=True, download=True, transform=transform
-    )
-    mnist_test = datasets.MNIST(
-        data_path, train=False, download=True, transform=transform
-    )
+    # Load datasets
+    mnist_train = datasets.MNIST(data_path, train=True, download=True, transform=transform)
+    mnist_test = datasets.MNIST(data_path, train=False, download=True, transform=transform)
 
+    # Define dataloaders
     training_loader = torch.utils.data.DataLoader(
         mnist_train, batch_size=batch_size, shuffle=True, drop_last=True
     )
@@ -59,7 +58,7 @@ def main():
     num_steps = 25
     beta = 0.95
 
-    # Memrisitive Configuration
+    # Memristive Configuration
     PF_config = {
         "experimental_data": experimental_data,
         "k_V": 0.5,
@@ -67,6 +66,7 @@ def main():
         "disturb_conductance": False,
     }
 
+    # Initialize network
     net = MSNN(
         device,
         num_inputs,
@@ -77,89 +77,78 @@ def main():
         memrisitive_config=PF_config,
     ).to(device)
 
-    loss = nn.CrossEntropyLoss()
+    # Loss and optimizer
+    loss_fn = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(net.parameters(), lr=5e-4, betas=(0.9, 0.999))
 
+    # Training parameters
     num_epochs = 1
     loss_hist = []
     test_loss_hist = []
     test_acc_hist = []
     counter = 0
 
-    def print_batch_accuracy(data, targets, train=False):
-        output, _ = net(data.view(batch_size, -1))
-        _, idx = output.sum(dim=0).max(1)
-        acc = np.mean((targets == idx).detach().cpu().numpy())
-        test_acc_hist.append(acc.item())
-
+    def calculate_accuracy(output, targets, train=False):
+        _, predicted = output.sum(dim=0).max(1)
+        accuracy = (predicted == targets).float().mean().item()
         if train:
-            print(f"Train set accuracy for a single minibatch: {acc*100:.2f}%")
+            print(f"Train accuracy: {accuracy * 100:.2f}%")
         else:
-            print(f"Test set accuracy for a single minibatch: {acc*100:.2f}%")
-            test_acc_hist.append(acc.item())
+            print(f"Test accuracy: {accuracy * 100:.2f}%")
+        return accuracy
 
-    def train_printer():
-        print(f"--- {time.time() - start_time} seconds ---")
+    def log_progress(epoch, iter_counter):
+        print(f"--- {time.time() - start_time:.2f} seconds ---")
         print(f"Epoch {epoch}, Iteration {iter_counter}")
-        print(f"Train Set Loss: {loss_hist[counter]:.2f}")
-        print(f"Test Set Loss: {test_loss_hist[counter]:.2f}")
-        print_batch_accuracy(data, targets, train=True)
-        print_batch_accuracy(test_data, test_targets, train=False)
+        print(f"Train Loss: {loss_hist[-1]:.4f}")
+        print(f"Test Loss: {test_loss_hist[-1]:.4f}")
         print("\n")
 
-    # Outer training loop
+    # Training loop
     for epoch in range(num_epochs):
         iter_counter = 0
-        train_batch = iter(training_loader)
+        for data, targets in training_loader:
+            data, targets = data.to(device), targets.to(device)
 
-        # Minibatch training loop
-        for data, targets in train_batch:
-            data = data.to(device)
-            targets = targets.to(device)
-
-            # forward pass
+            # Forward pass
             net.train()
             spk_rec, mem_rec = net(data.view(batch_size, -1))
 
-            # initialize the loss & sum over time
-            loss_val = torch.zeros((1), dtype=dtype, device=device)
-            for step in range(num_steps):
-                loss_val += loss(mem_rec[step], targets)
+            # Compute loss
+            loss_val = sum(loss_fn(mem_rec[step], targets) for step in range(num_steps))
 
-            # Gradient calculation + weight update
+            # Backpropagation
             optimizer.zero_grad()
             loss_val.backward()
             optimizer.step()
 
-            # Store loss history for future plotting
+            # Log training loss
             loss_hist.append(loss_val.item())
 
-            # Test set
+            # Evaluate on validation set
             with torch.no_grad():
                 net.eval()
                 test_data, test_targets = next(iter(validation_loader))
-                test_data = test_data.to(device)
-                test_targets = test_targets.to(device)
+                test_data, test_targets = test_data.to(device), test_targets.to(device)
 
-                # Test set forward pass
+                # Test forward pass
                 test_spk, test_mem = net(test_data.view(batch_size, -1))
 
-                # Test set loss
-                test_loss = torch.zeros((1), dtype=dtype, device=device)
-                for step in range(num_steps):
-                    test_loss += loss(test_mem[step], test_targets)
+                # Compute test loss
+                test_loss = sum(loss_fn(test_mem[step], test_targets) for step in range(num_steps))
                 test_loss_hist.append(test_loss.item())
 
-                # Print train/test loss/accuracy
+                # Log metrics
                 if counter % 50 == 0:
-                    train_printer()
-                counter += 1
-                iter_counter += 1
+                    log_progress(epoch, iter_counter)
+                    calculate_accuracy(mem_rec, targets, train=True)
+                    calculate_accuracy(test_mem, test_targets, train=False)
 
-    pass
+            counter += 1
+            iter_counter += 1
 
 
-def main2():
+def convolution():
     # dataloader arguments
     batch_size = 128
     data_path = "C:\\Users\\Mr_VC\\git\\mnn-torch\\data"
@@ -299,4 +288,4 @@ def main2():
 
 
 if __name__ == "__main__":
-    main2()
+    main()
