@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.optimize import curve_fit
+from scipy.stats import gaussian_kde, truncnorm
 import scipy.constants as const
 import torch
 
@@ -28,38 +29,58 @@ def disturb_conductance_fixed(G, fixed_conductance, true_probability=0.5):
     return G
 
 
-def disturb_conductance_device(G, G_on, G_off, R_on_log_std, R_off_log_std):
+def disturb_conductance_device(G, G_on, G_off, true_probability=0.1):
     """
-    Disturbs the conductance based on device parameters such as G_on, G_off, and log standard deviations.
+    Models stuck devices by probabilistically fixing their conductance to G_off or G_on.
 
     Args:
-    - G: The original conductance array.
-    - G_on: The conductance when the device is in the "on" state.
-    - G_off: The conductance when the device is in the "off" state.
-    - R_on_log_std: The log standard deviation of the resistance when the device is "on".
-    - R_off_log_std: The log standard deviation of the resistance when the device is "off".
+    - G (torch.Tensor): Original conductance tensor.
+    - G_on (float or torch.Tensor): Maximum conductance value.
+    - G_off (float or torch.Tensor): Minimum conductance value.
+    - true_probability (float): Proportion of devices to be stuck (0 to 1).
 
     Returns:
-    - G: The disturbed conductance array.
+    - torch.Tensor: Updated conductance tensor with probabilistic stuck behavior.
     """
-    R = 1 / G  # Convert conductance to resistance
-    R_on = 1 / G_on
-    R_off = 1 / G_off
+    device = G.device
+    G_on = torch.tensor(G_on, device=device, dtype=torch.float32)
+    G_off = torch.tensor(G_off, device=device, dtype=torch.float32)
 
-    # Interpolate log standard deviation for each resistance value
-    log_std = np.interp(R, [R_on, R_off], [R_on_log_std, R_off_log_std])
-    R_squared = np.power(R, 2)
-    log_var = np.power(log_std, 2)
+    # Calculate conductance range and median range
+    conductance_range = G_on - G_off
+    median_range = torch.median(conductance_range)
 
-    # Compute variance and mean for lognormal distribution
-    R_var = R_squared * (np.exp(log_var) - 1)
-    log_mu = np.log(R_squared / np.sqrt(R_squared + R_var))
+    # Identify potentially stuck devices based on range criteria
+    stuck_mask = (G - G_off).abs() < (0.5 * median_range)
 
-    # Generate new resistance values from lognormal distribution
-    R = np.random.lognormal(mean=log_mu, sigma=log_std)
+    # Generate a PDF for stuck values using KDE
+    G_flat = G[~stuck_mask].detach().cpu().numpy()  # Non-stuck conductance values
+    kde = gaussian_kde(G_flat)
+    kde_samples = kde.resample(len(G_flat)).flatten()
 
-    # Convert back to conductance
-    G = 1 / R
+    # Apply truncated normal distribution to mitigate bias near zero
+    a, b = (0 - kde_samples.mean()) / kde_samples.std(), float('inf')
+    truncated_samples = truncnorm(a, b, loc=kde_samples.mean(), scale=kde_samples.std()).rvs(len(G_flat))
+    truncated_samples = torch.tensor(truncated_samples, device=device, dtype=torch.float32)
+
+    # Map stuck devices probabilistically to G_off or G_on
+    stuck_values = torch.where(
+        torch.rand_like(G, device=device) < 0.5, G_off, G_on
+    )
+
+    # Generate a random mask to select which devices are stuck
+    random_stuck_mask = torch.rand_like(G, device=device) < true_probability
+
+    # Incorporate device-to-device variability using lognormal distribution
+    log_var = torch.var(torch.log(G + 1e-8))  # Add epsilon to avoid log(0)
+    log_std = torch.sqrt(log_var)
+    log_mu = torch.log(G + 1e-8) - (0.5 * log_var)
+    variability_samples = torch.exp(torch.normal(mean=log_mu, std=log_std))
+
+    # Combine stuck and non-stuck conductance values
+    G[random_stuck_mask] = stuck_values[random_stuck_mask]
+    G[~random_stuck_mask] = variability_samples[~random_stuck_mask]
+
     return G
 
 

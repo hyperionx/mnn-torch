@@ -1,13 +1,14 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from scipy.stats import truncnorm, lognorm
-from mnn_torch.effects import disturb_conductance_fixed
+
+from mnn_torch.effects import disturb_conductance_fixed, disturb_conductance_device
+
 
 class MemristorLinearLayer(nn.Module):
     """
     Custom memristive linear layer.
-    This layer simulates the behavior of memristors, optionally applying 
+    This layer simulates the behavior of memristors, optionally applying
     disturbances and non-ideal effects based on the provided configuration.
     """
 
@@ -21,14 +22,20 @@ class MemristorLinearLayer(nn.Module):
         - memristive_config (dict): Configuration dictionary containing:
             - 'ideal': If True, the layer behaves like a standard linear layer.
             - 'disturb_conductance': Whether to disturb conductance values.
+            - 'disturb_mode': The mode of disturbance ('fixed' or 'device').
+            - 'disturbance_probability': The probability for disturbance.
             - 'G_off', 'G_on': Minimum and maximum conductance values.
             - 'R', 'c', 'd_epsilon', 'k_V': Parameters for non-ideal effects.
         """
         super().__init__()
         self.size_in = size_in
         self.size_out = size_out
+
+        # Load configuration
         self.ideal = memristive_config.get("ideal", True)
         self.disturb_conductance = memristive_config.get("disturb_conductance", False)
+        self.disturb_mode = memristive_config.get("disturb_mode", "fixed")
+        self.disturbance_probability = memristive_config.get("disturbance_probability", 0.1)
 
         # Initialize weights and biases
         self.weights = nn.Parameter(torch.Tensor(size_out, size_in))
@@ -69,7 +76,7 @@ class MemristorLinearLayer(nn.Module):
 
     def memristive_outputs(self, x, weights_and_bias):
         """
-        Computes the memristive layer outputs based on voltage, conductance, 
+        Computes the memristive layer outputs based on voltage, conductance,
         and current relationships.
 
         Args:
@@ -95,9 +102,12 @@ class MemristorLinearLayer(nn.Module):
             G_pos.size(0), -1
         )
 
-        # Optionally disturb conductance values
+        # Disturb conductance based on the selected mode
         if self.disturb_conductance:
-            G = disturb_conductance_fixed(G, self.G_on, true_probability=0.5)
+            if self.disturb_mode == "fixed":
+                G = disturb_conductance_fixed(G, self.G_on, true_probability=self.disturbance_probability)
+            elif self.disturb_mode == "device":
+                G = disturb_conductance_device(G, self.G_on, self.G_off, true_probability=self.disturbance_probability)
 
         # Compute current
         I_ind = torch.unsqueeze(V, dim=-1) * torch.unsqueeze(G, dim=0)
@@ -107,7 +117,6 @@ class MemristorLinearLayer(nn.Module):
         # Output calculation
         y = I_total / k_I
         return y
-
 
 class HomeostasisDropout(nn.Module):
     def __init__(self):

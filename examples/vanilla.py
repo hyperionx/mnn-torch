@@ -39,15 +39,18 @@ def main():
 
     # Memristive configuration
     PF_config = {
-        "k_V": 0.5,
         "ideal": False,
-        "disturb_conductance": False,
-        "homeostasis_threshold": 10,
+        "k_V": 0.5,
         "G_off": G_off,
         "G_on": G_on,
         "R": R,
         "c": c,
         "d_epsilon": d_epsilon,
+        "disturb_conductance": False,
+        "disturb_mode": "fixed",
+        "disturbance_probability": 0.1,
+        "homeostasis_dropout": False,
+        "homeostasis_threshold": 10,
     }
 
     # Data loading
