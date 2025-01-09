@@ -7,9 +7,9 @@ import torchvision.datasets as datasets
 from torch.utils.data.sampler import SubsetRandomSampler
 
 from mnn_torch.devices import load_SiOx_multistate
-from mnn_torch.models import SNN
+from mnn_torch.models import MSNN
 from snntorch import surrogate, functional as SF, utils
-from mnn_torch.effects import compute_PooleFrenkel_parameters, disturb_conductance_fixed
+from mnn_torch.effects import compute_PooleFrenkel_parameters
 
 
 def main():
@@ -39,7 +39,6 @@ def main():
 
     # Memristive configuration
     PF_config = {
-        "experimental_data": experimental_data,
         "k_V": 0.5,
         "ideal": False,
         "disturb_conductance": False,
@@ -68,7 +67,7 @@ def main():
     )
 
     # Initialize network
-    net = SNN(num_inputs, num_hidden, num_outputs, num_steps, beta, PF_config).to(device)
+    net = MSNN(num_inputs, num_hidden, num_outputs, num_steps, beta, PF_config).to(device)
     loss = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(net.parameters(), lr=lr)
 

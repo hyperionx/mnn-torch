@@ -1,70 +1,71 @@
 import time
 import numpy as np
-import torch, torch.nn as nn
+import torch
+import torch.nn as nn
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
-from torch.utils.data.sampler import SubsetRandomSampler
-
+from torch.utils.data import DataLoader
+from snntorch import surrogate, backprop, functional as SF, utils
 from mnn_torch.devices import load_SiOx_multistate
-from mnn_torch.models import MSNN, MCSNN, CSNN, SNN
-from snntorch import surrogate
-from snntorch import backprop
-from snntorch import functional as SF
-from snntorch import utils
-from snntorch import spikeplot as splt
+from mnn_torch.effects import compute_PooleFrenkel_parameters
+from mnn_torch.models import MCSNN
+
 
 def main():
-    # dataloader arguments
+    # Dataloader arguments
     batch_size = 128
-    data_path = "C:\\Users\\Mr_VC\\git\\mnn-torch\\data"
+    data_path = "./data"
     experimental_data = load_SiOx_multistate("./data/SiO_x-multistate-data.mat")
-    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    (
+        G_off,
+        G_on,
+        R,
+        c,
+        d_epsilon,
+    ) = compute_PooleFrenkel_parameters(experimental_data)
 
-    # Define a transform
-    transform = transforms.Compose(
-        [
-            transforms.Resize((28, 28)),
-            transforms.Grayscale(),
-            transforms.ToTensor(),
-            transforms.Normalize((0,), (1,)),
-        ]
-    )
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    mnist_train = datasets.MNIST(
-        data_path, train=True, download=True, transform=transform
-    )
-    mnist_test = datasets.MNIST(
-        data_path, train=False, download=True, transform=transform
-    )
+    # Define a transform for MNIST
+    transform = transforms.Compose([
+        transforms.Resize((28, 28)),
+        transforms.Grayscale(),
+        transforms.ToTensor(),
+        transforms.Normalize((0,), (1,))
+    ])
 
-    training_loader = torch.utils.data.DataLoader(
-        mnist_train, batch_size=batch_size, shuffle=True, drop_last=True
-    )
-    validation_loader = torch.utils.data.DataLoader(
-        mnist_test, batch_size=batch_size, shuffle=True, drop_last=True
-    )
+    mnist_train = datasets.MNIST(data_path, train=True, download=True, transform=transform)
+    mnist_test = datasets.MNIST(data_path, train=False, download=True, transform=transform)
+
+    training_loader = DataLoader(mnist_train, batch_size=batch_size, shuffle=True, drop_last=True)
+    validation_loader = DataLoader(mnist_test, batch_size=batch_size, shuffle=True, drop_last=True)
 
     spike_grad = surrogate.fast_sigmoid(slope=25)
     beta = 0.5
     num_steps = 25
 
-    # Network Architecture
+    # Network Architecture parameters
     num_kernels = 5
     num_conv1 = 12
     num_conv2 = 64
     max_pooling = 2
-    num_hidden = num_conv2 * 4 * 4
+    num_hidden = num_conv2 * 4 * 4  # Adjust according to your layer sizes
     num_outputs = 10
 
-    memrisitive_config = {
-        "experimental_data": experimental_data,
+    # Memristive configuration (set "ideal" to False or True for different behavior)
+    PF_config = {
         "k_V": 0.5,
         "ideal": False,
-        "disturb_conductance": True,
+        "disturb_conductance": False,
+        "G_off": G_off,
+        "G_on": G_on,
+        "R": R,
+        "c": c,
+        "d_epsilon": d_epsilon,
     }
 
+    # Initialize model
     net = MCSNN(
-        device=device,
         beta=beta,
         spike_grad=spike_grad,
         batch_size=batch_size,
@@ -74,11 +75,12 @@ def main():
         max_pooling=max_pooling,
         num_hidden=num_hidden,
         num_outputs=num_outputs,
-        memrisitive_config=memrisitive_config,
-    )
+        memristive_config=PF_config
+    ).to(device)
 
     loss_fn = SF.ce_rate_loss()
 
+    # Forward pass function
     def forward_pass(net, num_steps, data):
         mem_rec = []
         spk_rec = []
@@ -91,14 +93,14 @@ def main():
 
         return torch.stack(spk_rec), torch.stack(mem_rec)
 
-    def batch_accuracy(train_loader, net, num_steps):
+    # Batch accuracy function
+    def batch_accuracy(loader, net, num_steps):
         with torch.no_grad():
             total = 0
             acc = 0
             net.eval()
 
-            train_loader = iter(train_loader)
-            for data, targets in train_loader:
+            for data, targets in loader:
                 data = data.to(device)
                 targets = targets.to(device)
                 spk_rec, _ = forward_pass(net, num_steps, data)
@@ -108,6 +110,7 @@ def main():
 
         return acc / total
 
+    # Optimizer setup
     optimizer = torch.optim.Adam(net.parameters(), lr=1e-2, betas=(0.9, 0.999))
     num_epochs = 1
     loss_hist = []
@@ -116,40 +119,34 @@ def main():
 
     # Outer training loop
     for epoch in range(num_epochs):
-
         # Training loop
-        for data, targets in iter(training_loader):
-            data = data.to(device)
-            targets = targets.to(device)
+        net.train()
+        for data, targets in training_loader:
+            data, targets = data.to(device), targets.to(device)
 
-            # forward pass
-            net.train()
+            # Forward pass
             spk_rec, _ = forward_pass(net, num_steps, data)
 
-            # initialize the loss & sum over time
+            # Compute loss
             loss_val = loss_fn(spk_rec, targets)
 
-            # Gradient calculation + weight update
+            # Backprop and optimization
             optimizer.zero_grad()
             loss_val.backward()
             optimizer.step()
 
-            # Store loss history for future plotting
+            # Record loss history
             loss_hist.append(loss_val.item())
 
-            # Test set
+            # Evaluation on the test set every 50 steps
             if counter % 50 == 0:
-                with torch.no_grad():
-                    net.eval()
-
-                    # Test set forward pass
-                    test_acc = batch_accuracy(validation_loader, net, num_steps)
-                    print(f"Iteration {counter}, Test Acc: {test_acc * 100:.2f}%\n")
-                    test_acc_hist.append(test_acc.item())
+                test_acc = batch_accuracy(validation_loader, net, num_steps)
+                print(f"Iteration {counter}, Test Accuracy: {test_acc * 100:.2f}%")
+                test_acc_hist.append(test_acc.item())
 
             counter += 1
 
-    pass
+    pass  # Training is complete
 
 
 if __name__ == "__main__":
