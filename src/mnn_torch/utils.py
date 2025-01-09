@@ -1,51 +1,93 @@
-import torch
 import numpy as np
-import numpy.typing as npt
-
 from scipy.stats import linregress
 
+def sort_multiple_arrays(key_array: np.ndarray, *arrays_to_sort: np.ndarray):
+    """
+    Sorts multiple arrays based on the values in `key_array`.
 
-def sort_multiple_arrays(key_lst: npt.NDArray, *other_lsts: npt.NDArray):
-    """Sorts multiple arrays based on the values of `key_lst`."""
-    sorted_idx = np.argsort(key_lst)
-    sorted_key_lst = key_lst[sorted_idx]
-    sorted_other_lsts = [other_lst[sorted_idx] for other_lst in other_lsts]
-    return sorted_key_lst, *sorted_other_lsts
+    Args:
+    - key_array: The array used as a sorting key.
+    - arrays_to_sort: The arrays that will be sorted in the same way as `key_array`.
 
-
-def compute_multivariate_linear_regression_parameters(x, *y):
-    slopes: list[float] = []
-    intercepts: list[float] = []
-    residuals_list: list[float] = []
-
-    for y_i in y:
-        result = linregress(x, y_i)
-        slopes.append(result.slope)
-        intercepts.append(result.intercept)
-
-        y_pred = result.slope * x + result.intercept
-        residuals = y_i - y_pred
-        residuals_list.append(residuals.tolist())
-
-    slopes = torch.tensor(slopes, dtype=torch.float32)
-    intercepts = torch.tensor(intercepts, dtype=torch.float32)
-    residuals_list = torch.tensor(residuals_list, dtype=torch.float32)
-    covariance_matrix = torch.cov(residuals_list)
-
-    return slopes, intercepts, covariance_matrix
+    Returns:
+    - The sorted key_array, followed by all the other sorted arrays.
+    """
+    # Get the indices that would sort the key array
+    sorted_indices = np.argsort(key_array)
+    
+    # Sort all arrays using the sorted indices
+    sorted_key_array = key_array[sorted_indices]
+    sorted_arrays = [array[sorted_indices] for array in arrays_to_sort]
+    
+    return sorted_key_array, *sorted_arrays
 
 
-def predict_multivariate_linear_regression(x, slopes, intercepts, covariance_matrix):
-    linear_fit = torch.einsum("i...,j->i...j", x, slopes) + torch.einsum(
-        "i...,j->i...j", torch.ones(x.shape).to(x.device), intercepts
+def compute_multivariate_linear_regression(x: np.ndarray, *y_arrays: np.ndarray):
+    """
+    Computes the multivariate linear regression parameters (slopes, intercepts, residuals).
+
+    Args:
+    - x: The independent variable.
+    - y_arrays: Multiple dependent variables.
+
+    Returns:
+    - slopes: The slope of the regression for each dependent variable.
+    - intercepts: The intercept of the regression for each dependent variable.
+    - covariance_matrix: The covariance matrix of the residuals across all dependent variables.
+    """
+    slopes = []
+    intercepts = []
+    residuals_list = []
+
+    for y in y_arrays:
+        # Perform linear regression on x and y
+        regression_result = linregress(x, y)
+        
+        # Store regression parameters
+        slopes.append(regression_result.slope)
+        intercepts.append(regression_result.intercept)
+        
+        # Compute residuals (actual - predicted values)
+        predicted_y = regression_result.slope * x + regression_result.intercept
+        residuals = y - predicted_y
+        residuals_list.append(residuals)
+    
+    # Convert lists to numpy arrays
+    slopes_array = np.array(slopes, dtype=np.float32)
+    intercepts_array = np.array(intercepts, dtype=np.float32)
+    residuals_array = np.array(residuals_list, dtype=np.float32)
+
+    # Compute the covariance matrix of the residuals
+    covariance_matrix = np.cov(residuals_array)
+
+    return slopes_array, intercepts_array, covariance_matrix
+
+
+def predict_with_multivariate_linear_regression(x: np.ndarray, slopes: np.ndarray, intercepts: np.ndarray, covariance_matrix: np.ndarray):
+    """
+    Predicts values using a multivariate linear regression model, including deviations based on residuals.
+
+    Args:
+    - x: The input values to predict for.
+    - slopes: The slopes for the linear regression model.
+    - intercepts: The intercepts for the linear regression model.
+    - covariance_matrix: The covariance matrix of the residuals.
+
+    Returns:
+    - deviated_fit: The predicted values with added deviations from the covariance matrix.
+    """
+    # Calculate the linear fit (dot product between x and slopes, plus intercepts)
+    linear_fit = np.einsum("i...,j->i...j", x, slopes) + np.einsum(
+        "i...,j->i...j", np.ones(x.shape), intercepts
     )
 
-    linear_deviations = torch.distributions.MultivariateNormal(
-        loc=torch.zeros(2).to(x.device),
-        scale_tril=torch.linalg.cholesky(covariance_matrix),
-    ).sample(sample_shape=x.shape)
+    # Generate deviations based on the covariance matrix
+    linear_deviations = np.random.multivariate_normal(
+        mean=np.zeros(2), cov=covariance_matrix, size=x.shape[0]
+    )
 
-    linear_deviated_fit = linear_fit + linear_deviations
-    deviated_fit = torch.einsum("...i->i...", linear_deviated_fit)
-
-    return deviated_fit
+    # Add deviations to the linear fit to get the final predicted values
+    deviated_fit = linear_fit + linear_deviations
+    
+    # Summarize and return the result
+    return np.sum(deviated_fit, axis=-1)

@@ -5,60 +5,42 @@ import torch.nn.functional as F
 
 from mnn_torch.layers import MemristorLinearLayer
 
-
-# Define Network
+# Define a unified SNN model with flexible layer choice
 class SNN(nn.Module):
-    def __init__(self, device, num_inputs, num_hidden, num_outputs, num_steps, beta):
+    def __init__(self, num_inputs, num_hidden, num_outputs, num_steps, beta, memristive_config):
         super().__init__()
         self.num_steps = num_steps
-        self.fc1 = nn.Linear(num_inputs, num_hidden, device=device)
-        self.lif1 = snn.Leaky(beta=beta)
-        self.fc2 = nn.Linear(num_hidden, num_outputs, device=device)
-        self.lif2 = snn.Leaky(beta=beta)
+        self.beta = beta
+        self.memristive_config = memristive_config
+
+        # Decide which linear layer to use based on the "ideal" key in memristive_config
+        self.fc1, self.lif1 = self._build_layer(num_inputs, num_hidden)
+        self.fc2, self.lif2 = self._build_layer(num_hidden, num_outputs)
+
+    def _build_layer(self, in_features, out_features):
+        """Helper method to build a linear layer followed by a LIF neuron.
+        If 'ideal' is True, use nn.Linear. Otherwise, use MemristorLinearLayer."""
+        if self.memristive_config.get("ideal", False):
+            fc = nn.Linear(in_features, out_features)
+        else:
+            fc = MemristorLinearLayer(in_features, out_features, self.memristive_config)
+        lif = snn.Leaky(beta=self.beta)
+        return fc, lif
 
     def forward(self, x):
-        mem1 = self.lif1.init_leaky()
-        mem2 = self.lif2.init_leaky()
+        # Initialize hidden states for both LIF neurons
+        mem1, mem2 = self.lif1.init_leaky(), self.lif2.init_leaky()
         spk2_rec, mem2_rec = [], []
 
         for _ in range(self.num_steps):
+            # Propagate through the first layer and LIF
             cur1 = self.fc1(x)
             spk1, mem1 = self.lif1(cur1, mem1)
+
+            # Propagate through the second layer and LIF
             cur2 = self.fc2(spk1)
             spk2, mem2 = self.lif2(cur2, mem2)
-            spk2_rec.append(spk2)
-            mem2_rec.append(mem2)
 
-        return torch.stack(spk2_rec, dim=0), torch.stack(mem2_rec, dim=0)
-
-class MSNN(nn.Module):
-    """Memristive Spiking Neural Network"""
-
-    def __init__(
-        self, num_inputs, num_hidden, num_outputs, num_steps, beta, memrisitive_config
-    ):
-        super().__init__()
-        self.num_steps = num_steps
-
-        # Define layers with updated configuration
-        self.fc1 = MemristorLinearLayer(num_inputs, num_hidden, memrisitive_config)
-        self.lif1 = snn.Leaky(beta=beta)
-        self.fc2 = MemristorLinearLayer(num_hidden, num_outputs, memrisitive_config)
-        self.lif2 = snn.Leaky(beta=beta)
-
-    def forward(self, x):
-        # Initialize hidden states
-        mem1 = self.lif1.init_leaky()
-        mem2 = self.lif2.init_leaky()
-
-        spk2_rec = []
-        mem2_rec = []
-
-        for _ in range(self.num_steps):
-            cur1 = self.fc1(x)
-            spk1, mem1 = self.lif1(cur1, mem1)
-            cur2 = self.fc2(spk1)
-            spk2, mem2 = self.lif2(cur2, mem2)
             spk2_rec.append(spk2)
             mem2_rec.append(mem2)
 
