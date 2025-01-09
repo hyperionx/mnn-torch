@@ -1,6 +1,4 @@
-import torch
 import numpy as np
-
 from scipy.optimize import curve_fit
 import scipy.constants as const
 
@@ -13,9 +11,8 @@ from mnn_torch.utils import (
 
 
 def disturb_conductance_fixed(G, fixed_conductance, true_probability=0.5):
-    mask = torch.rand(G.shape).to(G.device) < true_probability
-    G = torch.where(mask, fixed_conductance, G)
-
+    mask = np.random.rand(*G.shape) < true_probability
+    G = np.where(mask, fixed_conductance, G)
     return G
 
 
@@ -25,24 +22,20 @@ def disturb_conductance_device(G, G_on, G_off, R_on_log_std, R_off_log_std):
     R_off = 1 / G_off
 
     log_std_ref = [R_on_log_std, R_off_log_std]
-    log_std = torch.from_numpy(
-        np.interp(R.numpy(), (R_on.numpy(), R_off.numpy()), log_std_ref.numpy())
-    )
-    R_squared = torch.pow(R, 2)
-    log_var = torch.pow(log_std, 2)
+    log_std = np.interp(R, [R_on, R_off], log_std_ref)
+    R_squared = np.power(R, 2)
+    log_var = np.power(log_std, 2)
 
-    R_var = R_squared * (torch.exp(log_var) - 1)
-    log_mu = torch.log(R_squared / (torch.sqrt(R_squared + R_var)))
-    R = torch.distributions.log_normal.LogNormal(log_mu, log_std).sample()
+    R_var = R_squared * (np.exp(log_var) - 1)
+    log_mu = np.log(R_squared / np.sqrt(R_squared + R_var))
+    R = np.random.lognormal(mean=log_mu, sigma=log_std)
 
     G = 1 / R
     return G
 
 
 def compute_PooleFrenkel_current(V, c, d_epsilon):
-    # TODO: convert to Torch
-
-    V_abs = np.absolute(V)
+    V_abs = np.abs(V)
     V_sign = np.sign(V)
     I = (
         V_sign
@@ -54,24 +47,22 @@ def compute_PooleFrenkel_current(V, c, d_epsilon):
             / (const.Boltzmann * (const.zero_Celsius + 20.0))
         )
     )
-
     return I
 
 
 def compute_PooleFrenkel_total_current(V, G, slopes, intercepts, covariance_matrix):
     R = 1 / G
-    ln_R = torch.log(R)
+    ln_R = np.log(R)
 
     fit_data = predict_multivariate_linear_regression(
         ln_R, slopes, intercepts, covariance_matrix
     )
-    c = torch.exp(fit_data[0])
-    d_epsilon = torch.exp(fit_data[1])
+    c = np.exp(fit_data[0])
+    d_epsilon = np.exp(fit_data[1])
     I_ind = compute_PooleFrenkel_current(V, c, d_epsilon)
 
     # Add currents along bit lines
     I = np.sum(I_ind, axis=1)
-
     return I, I_ind
 
 
@@ -88,7 +79,7 @@ def compute_PooleFrenkel_relationship(V, I, voltage_step=0.005, ref_voltage=0.1)
 
         r = v[ref_idx] / i[ref_idx]
         R[idx] = r
-        popt, pcov = curve_fit(compute_PooleFrenkel_current, v, i, p0=[1e-5, 1e-16])
+        popt, _ = curve_fit(compute_PooleFrenkel_current, v, i, p0=[1e-5, 1e-16])
         c[idx] = popt[0]
         d_epsilon[idx] = popt[1]
 
@@ -101,9 +92,9 @@ def compute_PooleFrenkel_parameters(
 ):
     V, I = load_SiOx_curves(experimental_data)
     R, c, d_epsilon, _, _ = compute_PooleFrenkel_relationship(V, I)
-    R = torch.tensor(R, dtype=torch.float32)
-    c = torch.tensor(c, dtype=torch.float32)
-    d_epsilon = torch.tensor(d_epsilon, dtype=torch.float32)
+    R = R.astype(np.float32)
+    c = c.astype(np.float32)
+    d_epsilon = d_epsilon.astype(np.float32)
 
     if high_resistance_state:
         G_off = 1 / R[-1]
@@ -123,18 +114,16 @@ def compute_PooleFrenkel_regression_parameters(
     )
 
     if high_resistance_state:
-        x = torch.log(R)[sep_idx:]
-        y_1 = torch.log(c)[sep_idx:]
-        y_2 = torch.log(d_epsilon)[sep_idx:]
+        x = np.log(R[sep_idx:])
+        y_1 = np.log(c[sep_idx:])
+        y_2 = np.log(d_epsilon[sep_idx:])
     else:
-        x = torch.log(R)[:sep_idx]
-        y_1 = torch.log(c)[:sep_idx]
-        y_2 = torch.log(d_epsilon)[:sep_idx]
+        x = np.log(R[:sep_idx])
+        y_1 = np.log(c[:sep_idx])
+        y_2 = np.log(d_epsilon[:sep_idx])
 
-    (
-        slopes,
-        intercepts,
-        covariance_matrix,
-    ) = compute_multivariate_linear_regression_parameters(x, y_1, y_2)
+    slopes, intercepts, covariance_matrix = compute_multivariate_linear_regression_parameters(
+        x, y_1, y_2
+    )
 
     return slopes, intercepts, covariance_matrix

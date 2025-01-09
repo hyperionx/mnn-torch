@@ -31,29 +31,28 @@ class SNN(nn.Module):
 
         return torch.stack(spk2_rec, dim=0), torch.stack(mem2_rec, dim=0)
 
-
 class MSNN(nn.Module):
+    """Memristive Spiking Neural Network"""
+
     def __init__(
-        self,
-        device,
-        num_inputs,
-        num_hidden,
-        num_outputs,
-        num_steps,
-        beta,
-        memrisitive_config,
+        self, num_inputs, num_hidden, num_outputs, num_steps, beta, memrisitive_config
     ):
         super().__init__()
         self.num_steps = num_steps
-        self.fc1 = MemristorLinearLayer(device, num_inputs, num_hidden, memrisitive_config)
+
+        # Define layers with updated configuration
+        self.fc1 = MemristorLinearLayer(num_inputs, num_hidden, memrisitive_config)
         self.lif1 = snn.Leaky(beta=beta)
-        self.fc2 = MemristorLinearLayer(device, num_hidden, num_outputs, memrisitive_config)
+        self.fc2 = MemristorLinearLayer(num_hidden, num_outputs, memrisitive_config)
         self.lif2 = snn.Leaky(beta=beta)
 
     def forward(self, x):
+        # Initialize hidden states
         mem1 = self.lif1.init_leaky()
         mem2 = self.lif2.init_leaky()
-        spk2_rec, mem2_rec = [], []
+
+        spk2_rec = []
+        mem2_rec = []
 
         for _ in range(self.num_steps):
             cur1 = self.fc1(x)
@@ -64,7 +63,6 @@ class MSNN(nn.Module):
             mem2_rec.append(mem2)
 
         return torch.stack(spk2_rec, dim=0), torch.stack(mem2_rec, dim=0)
-
 
 class CSNN(nn.Module):
     def __init__(
