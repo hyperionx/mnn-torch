@@ -54,14 +54,20 @@ def main():
     }
 
     # Data loading
-    transform = transforms.Compose([
-        transforms.Resize((28, 28)),
-        transforms.Grayscale(),
-        transforms.ToTensor(),
-        transforms.Normalize((0,), (1,)),
-    ])
-    mnist_train = datasets.MNIST(data_path, train=True, download=True, transform=transform)
-    mnist_test = datasets.MNIST(data_path, train=False, download=True, transform=transform)
+    transform = transforms.Compose(
+        [
+            transforms.Resize((28, 28)),
+            transforms.Grayscale(),
+            transforms.ToTensor(),
+            transforms.Normalize((0,), (1,)),
+        ]
+    )
+    mnist_train = datasets.MNIST(
+        data_path, train=True, download=True, transform=transform
+    )
+    mnist_test = datasets.MNIST(
+        data_path, train=False, download=True, transform=transform
+    )
 
     training_loader = torch.utils.data.DataLoader(
         mnist_train, batch_size=batch_size, shuffle=True, drop_last=True
@@ -71,7 +77,9 @@ def main():
     )
 
     # Initialize network
-    net = MSNN(num_inputs, num_hidden, num_outputs, num_steps, beta, PF_config).to(device)
+    net = MSNN(num_inputs, num_hidden, num_outputs, num_steps, beta, PF_config).to(
+        device
+    )
     loss = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(net.parameters(), lr=lr)
 
@@ -102,10 +110,14 @@ def main():
                 with torch.no_grad():
                     net.eval()
                     test_data, test_targets = next(iter(validation_loader))
-                    test_data, test_targets = test_data.to(device), test_targets.to(device)
+                    test_data, test_targets = test_data.to(device), test_targets.to(
+                        device
+                    )
 
                     test_spk, test_mem = net(test_data.view(batch_size, -1))
-                    test_loss = sum(loss(test_mem[step], test_targets) for step in range(num_steps))
+                    test_loss = sum(
+                        loss(test_mem[step], test_targets) for step in range(num_steps)
+                    )
                     test_loss_hist.append(test_loss.item())
 
                     # Compute accuracy

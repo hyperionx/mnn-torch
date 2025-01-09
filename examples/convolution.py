@@ -27,18 +27,28 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Define a transform for MNIST
-    transform = transforms.Compose([
-        transforms.Resize((28, 28)),
-        transforms.Grayscale(),
-        transforms.ToTensor(),
-        transforms.Normalize((0,), (1,))
-    ])
+    transform = transforms.Compose(
+        [
+            transforms.Resize((28, 28)),
+            transforms.Grayscale(),
+            transforms.ToTensor(),
+            transforms.Normalize((0,), (1,)),
+        ]
+    )
 
-    mnist_train = datasets.MNIST(data_path, train=True, download=True, transform=transform)
-    mnist_test = datasets.MNIST(data_path, train=False, download=True, transform=transform)
+    mnist_train = datasets.MNIST(
+        data_path, train=True, download=True, transform=transform
+    )
+    mnist_test = datasets.MNIST(
+        data_path, train=False, download=True, transform=transform
+    )
 
-    training_loader = DataLoader(mnist_train, batch_size=batch_size, shuffle=True, drop_last=True)
-    validation_loader = DataLoader(mnist_test, batch_size=batch_size, shuffle=True, drop_last=True)
+    training_loader = DataLoader(
+        mnist_train, batch_size=batch_size, shuffle=True, drop_last=True
+    )
+    validation_loader = DataLoader(
+        mnist_test, batch_size=batch_size, shuffle=True, drop_last=True
+    )
 
     spike_grad = surrogate.fast_sigmoid(slope=25)
     beta = 0.5
@@ -75,7 +85,7 @@ def main():
         max_pooling=max_pooling,
         num_hidden=num_hidden,
         num_outputs=num_outputs,
-        memristive_config=PF_config
+        memristive_config=PF_config,
     ).to(device)
 
     loss_fn = SF.ce_rate_loss()

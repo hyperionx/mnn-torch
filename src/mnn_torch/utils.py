@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.stats import linregress
 
+
 def sort_multiple_arrays(key_array: np.ndarray, *arrays_to_sort: np.ndarray):
     """
     Sorts multiple arrays based on the values in `key_array`.
@@ -14,11 +15,11 @@ def sort_multiple_arrays(key_array: np.ndarray, *arrays_to_sort: np.ndarray):
     """
     # Get the indices that would sort the key array
     sorted_indices = np.argsort(key_array)
-    
+
     # Sort all arrays using the sorted indices
     sorted_key_array = key_array[sorted_indices]
     sorted_arrays = [array[sorted_indices] for array in arrays_to_sort]
-    
+
     return sorted_key_array, *sorted_arrays
 
 
@@ -42,16 +43,16 @@ def compute_multivariate_linear_regression(x: np.ndarray, *y_arrays: np.ndarray)
     for y in y_arrays:
         # Perform linear regression on x and y
         regression_result = linregress(x, y)
-        
+
         # Store regression parameters
         slopes.append(regression_result.slope)
         intercepts.append(regression_result.intercept)
-        
+
         # Compute residuals (actual - predicted values)
         predicted_y = regression_result.slope * x + regression_result.intercept
         residuals = y - predicted_y
         residuals_list.append(residuals)
-    
+
     # Convert lists to numpy arrays
     slopes_array = np.array(slopes, dtype=np.float32)
     intercepts_array = np.array(intercepts, dtype=np.float32)
@@ -63,7 +64,12 @@ def compute_multivariate_linear_regression(x: np.ndarray, *y_arrays: np.ndarray)
     return slopes_array, intercepts_array, covariance_matrix
 
 
-def predict_with_multivariate_linear_regression(x: np.ndarray, slopes: np.ndarray, intercepts: np.ndarray, covariance_matrix: np.ndarray):
+def predict_with_multivariate_linear_regression(
+    x: np.ndarray,
+    slopes: np.ndarray,
+    intercepts: np.ndarray,
+    covariance_matrix: np.ndarray,
+):
     """
     Predicts values using a multivariate linear regression model, including deviations based on residuals.
 
@@ -88,6 +94,6 @@ def predict_with_multivariate_linear_regression(x: np.ndarray, slopes: np.ndarra
 
     # Add deviations to the linear fit to get the final predicted values
     deviated_fit = linear_fit + linear_deviations
-    
+
     # Summarize and return the result
     return np.sum(deviated_fit, axis=-1)

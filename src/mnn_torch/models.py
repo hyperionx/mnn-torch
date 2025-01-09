@@ -5,13 +5,16 @@ import torch.nn.functional as F
 
 from mnn_torch.layers import MemristorLinearLayer, HomeostasisDropout
 
+
 class MSNN(nn.Module):
-    def __init__(self, num_inputs, num_hidden, num_outputs, num_steps, beta, memristive_config):
+    def __init__(
+        self, num_inputs, num_hidden, num_outputs, num_steps, beta, memristive_config
+    ):
         super().__init__()
         self.num_steps = num_steps
         self.beta = beta
         self.memristive_config = memristive_config
-        self.homeostasis_threshold = memristive_config.get("homeostasis_threshold", 0.1)
+        self.homeostasis_threshold = memristive_config.get("homeostasis_threshold", 100)
 
         # Decide which linear layer to use based on the "ideal" key in memristive_config
         self.fc1, self.lif1 = self._build_layer(num_inputs, num_hidden)
@@ -21,12 +24,12 @@ class MSNN(nn.Module):
         if self.memristive_config.get("homeostasis_dropout", False):
             self.drop_layer = HomeostasisDropout()
         else:
-            self.drop_layer = None 
+            self.drop_layer = None
 
     def _build_layer(self, in_features, out_features):
         """Helper method to build a linear layer followed by a LIF neuron.
         If 'ideal' is True, use nn.Linear. Otherwise, use MemristorLinearLayer."""
-        
+
         if self.memristive_config.get("ideal", False):
             fc = nn.Linear(in_features, out_features)
         else:
@@ -55,7 +58,7 @@ class MSNN(nn.Module):
                 and len(spk1_rec) >= self.homeostasis_threshold
             ):
                 spk1_window = torch.stack(
-                    spk1_rec[-self.homeostasis_threshold:], dim=0
+                    spk1_rec[-self.homeostasis_threshold :], dim=0
                 )
                 spk1 = self.drop_layer(spk1_window)
 
@@ -82,7 +85,7 @@ class MCSNN(nn.Module):
         max_pooling,
         num_hidden,
         num_outputs,
-        memristive_config
+        memristive_config,
     ):
         super().__init__()
 

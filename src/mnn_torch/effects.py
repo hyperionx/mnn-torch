@@ -59,14 +59,16 @@ def disturb_conductance_device(G, G_on, G_off, true_probability=0.1):
     kde_samples = kde.resample(len(G_flat)).flatten()
 
     # Apply truncated normal distribution to mitigate bias near zero
-    a, b = (0 - kde_samples.mean()) / kde_samples.std(), float('inf')
-    truncated_samples = truncnorm(a, b, loc=kde_samples.mean(), scale=kde_samples.std()).rvs(len(G_flat))
-    truncated_samples = torch.tensor(truncated_samples, device=device, dtype=torch.float32)
+    a, b = (0 - kde_samples.mean()) / kde_samples.std(), float("inf")
+    truncated_samples = truncnorm(
+        a, b, loc=kde_samples.mean(), scale=kde_samples.std()
+    ).rvs(len(G_flat))
+    truncated_samples = torch.tensor(
+        truncated_samples, device=device, dtype=torch.float32
+    )
 
     # Map stuck devices probabilistically to G_off or G_on
-    stuck_values = torch.where(
-        torch.rand_like(G, device=device) < 0.5, G_off, G_on
-    )
+    stuck_values = torch.where(torch.rand_like(G, device=device) < 0.5, G_off, G_on)
 
     # Generate a random mask to select which devices are stuck
     random_stuck_mask = torch.rand_like(G, device=device) < true_probability
@@ -130,8 +132,10 @@ def compute_PooleFrenkel_total_current(V, G, slopes, intercepts, covariance_matr
     ln_R = np.log(R)
 
     # Predict regression results for ln(R)
-    fit_data = predict_with_multivariate_linear_regression(ln_R, slopes, intercepts, covariance_matrix)
-    
+    fit_data = predict_with_multivariate_linear_regression(
+        ln_R, slopes, intercepts, covariance_matrix
+    )
+
     # Extract coefficients for the Poole-Frenkel equation
     c = np.exp(fit_data[0])
     d_epsilon = np.exp(fit_data[1])
@@ -162,7 +166,7 @@ def compute_PooleFrenkel_relationship(V, I, voltage_step=0.005, ref_voltage=0.1)
     R = np.zeros(num_curves)
     c = np.zeros(num_curves)
     d_epsilon = np.zeros(num_curves)
-    
+
     ref_idx = int(ref_voltage / voltage_step)
 
     for idx in range(num_curves):
@@ -246,6 +250,8 @@ def compute_PooleFrenkel_regression_parameters(
         y_2 = np.log(d_epsilon[:sep_idx])
 
     # Compute regression parameters
-    slopes, intercepts, covariance_matrix = compute_multivariate_linear_regression(x, y_1, y_2)
+    slopes, intercepts, covariance_matrix = compute_multivariate_linear_regression(
+        x, y_1, y_2
+    )
 
     return slopes, intercepts, covariance_matrix

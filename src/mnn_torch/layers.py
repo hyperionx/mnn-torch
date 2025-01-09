@@ -35,7 +35,9 @@ class MemristorLinearLayer(nn.Module):
         self.ideal = memristive_config.get("ideal", True)
         self.disturb_conductance = memristive_config.get("disturb_conductance", False)
         self.disturb_mode = memristive_config.get("disturb_mode", "fixed")
-        self.disturbance_probability = memristive_config.get("disturbance_probability", 0.1)
+        self.disturbance_probability = memristive_config.get(
+            "disturbance_probability", 0.1
+        )
 
         # Initialize weights and biases
         self.weights = nn.Parameter(torch.Tensor(size_out, size_in))
@@ -105,9 +107,16 @@ class MemristorLinearLayer(nn.Module):
         # Disturb conductance based on the selected mode
         if self.disturb_conductance:
             if self.disturb_mode == "fixed":
-                G = disturb_conductance_fixed(G, self.G_on, true_probability=self.disturbance_probability)
+                G = disturb_conductance_fixed(
+                    G, self.G_on, true_probability=self.disturbance_probability
+                )
             elif self.disturb_mode == "device":
-                G = disturb_conductance_device(G, self.G_on, self.G_off, true_probability=self.disturbance_probability)
+                G = disturb_conductance_device(
+                    G,
+                    self.G_on,
+                    self.G_off,
+                    true_probability=self.disturbance_probability,
+                )
 
         # Compute current
         I_ind = torch.unsqueeze(V, dim=-1) * torch.unsqueeze(G, dim=0)
@@ -118,17 +127,18 @@ class MemristorLinearLayer(nn.Module):
         y = I_total / k_I
         return y
 
+
 class HomeostasisDropout(nn.Module):
     def __init__(self):
         """
-        A custom layer that drops the spike output if it has been spiking continuously 
+        A custom layer that drops the spike output if it has been spiking continuously
         over all time steps (across the entire sequence).
         """
         super(HomeostasisDropout, self).__init__()
 
     def forward(self, spk_rec):
         """
-        Forward pass that checks if the spikes are repeated across all time steps 
+        Forward pass that checks if the spikes are repeated across all time steps
         and sets those to zero if they are continuously '1' over the entire sequence.
 
         Args:
@@ -143,11 +153,19 @@ class HomeostasisDropout(nn.Module):
 
         # Check for continuous spikes across all time steps
         # Compare each time step with the next one to find continuous sequences of 1s
-        continuous_spikes = (spk_rec[1:] == 1) & (spk_rec[:-1] == 1)  # Shape: (num_steps-1, batch_size, num_features)
+        continuous_spikes = (spk_rec[1:] == 1) & (
+            spk_rec[:-1] == 1
+        )  # Shape: (num_steps-1, batch_size, num_features)
 
         # We want to drop the spikes that were continuous across all time steps
         # The spike is dropped if it was '1' in all steps
-        drop_mask = torch.cat([torch.zeros(1, batch_size, num_features, device=spk_rec.device), continuous_spikes], dim=0)
+        drop_mask = torch.cat(
+            [
+                torch.zeros(1, batch_size, num_features, device=spk_rec.device),
+                continuous_spikes,
+            ],
+            dim=0,
+        )
 
         # Set the repeated spikes to zero by applying the drop mask
         spk_rec = spk_rec * (1 - drop_mask).float()
