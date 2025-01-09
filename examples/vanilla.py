@@ -27,12 +27,12 @@ def main():
     ) = compute_PooleFrenkel_parameters(experimental_data)
 
     # Hyperparameters
-    batch_size = 128
+    batch_size = 64
     num_epochs = 1
     num_inputs = 28 * 28
     num_hidden = 100
     num_outputs = 10
-    num_steps = 25
+    num_steps = 200
     beta = 0.95
     data_path = "./data"
     lr = 5e-4
@@ -42,6 +42,7 @@ def main():
         "k_V": 0.5,
         "ideal": False,
         "disturb_conductance": False,
+        "homeostasis_threshold": 10,
         "G_off": G_off,
         "G_on": G_on,
         "R": R,

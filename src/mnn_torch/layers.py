@@ -2,75 +2,105 @@ import torch
 import torch.nn as nn
 import numpy as np
 from scipy.stats import truncnorm, lognorm
-
 from mnn_torch.effects import disturb_conductance_fixed
 
 class MemristorLinearLayer(nn.Module):
-    """Custom memristive layer inherited from torch"""
+    """
+    Custom memristive linear layer.
+    This layer simulates the behavior of memristors, optionally applying 
+    disturbances and non-ideal effects based on the provided configuration.
+    """
 
-    def __init__(self, size_in, size_out, memrisitive_config):
+    def __init__(self, size_in, size_out, memristive_config):
+        """
+        Initializes the memristive linear layer.
+
+        Args:
+        - size_in (int): Number of input features.
+        - size_out (int): Number of output features.
+        - memristive_config (dict): Configuration dictionary containing:
+            - 'ideal': If True, the layer behaves like a standard linear layer.
+            - 'disturb_conductance': Whether to disturb conductance values.
+            - 'G_off', 'G_on': Minimum and maximum conductance values.
+            - 'R', 'c', 'd_epsilon', 'k_V': Parameters for non-ideal effects.
+        """
         super().__init__()
-        self.size_in, self.size_out = size_in, size_out
-        self.weights = nn.Parameter(torch.Tensor(size_out, size_in))
-        self.bias = nn.Parameter(torch.Tensor(size_out))
-
-        self.ideal = memrisitive_config["ideal"]
-        self.disturb_conductance = memrisitive_config["disturb_conductance"]
+        self.size_in = size_in
+        self.size_out = size_out
+        self.ideal = memristive_config.get("ideal", True)
+        self.disturb_conductance = memristive_config.get("disturb_conductance", False)
 
         # Initialize weights and biases
+        self.weights = nn.Parameter(torch.Tensor(size_out, size_in))
+        self.bias = nn.Parameter(torch.Tensor(size_out))
         stdv = 1 / np.sqrt(self.size_in)
         nn.init.normal_(self.weights, mean=0, std=stdv)
         nn.init.constant_(self.bias, 0)
 
         if not self.ideal:
-            # Use precomputed Poole-Frenkel parameters
-            self.G_off = memrisitive_config["G_off"]
-            self.G_on = memrisitive_config["G_on"]
-            self.R = memrisitive_config["R"]
-            self.c = memrisitive_config["c"]
-            self.d_epsilon = memrisitive_config["d_epsilon"]
-            self.k_V = memrisitive_config["k_V"]
+            # Load non-ideal parameters from config
+            self.G_off = memristive_config["G_off"]
+            self.G_on = memristive_config["G_on"]
+            self.R = memristive_config["R"]
+            self.c = memristive_config["c"]
+            self.d_epsilon = memristive_config["d_epsilon"]
+            self.k_V = memristive_config["k_V"]
 
     def forward(self, x):
-        # Ensure that all tensors are on the same device as the input
+        """
+        Forward pass for the memristive linear layer.
+
+        Args:
+        - x (Tensor): Input tensor of shape (batch_size, size_in).
+
+        Returns:
+        - Tensor: Output tensor of shape (batch_size, size_out).
+        """
         device = x.device
 
-        if self.ideal:
-            # Simple weighted sum: w * x + b
-            w_times_x = torch.mm(x, self.weights.to(device))
-            return torch.add(w_times_x, self.bias.to(device))
-
         # Include bias in input
-        inputs = torch.cat([x, torch.ones([x.shape[0], 1], device=device)], 1)
-        bias = torch.unsqueeze(self.bias, 0).to(device)
-        weights_and_bias = torch.cat([self.weights.t(), bias], 0)
+        inputs = torch.cat([x, torch.ones([x.shape[0], 1], device=device)], dim=1)
+        bias = torch.unsqueeze(self.bias, dim=0).to(device)
+        weights_and_bias = torch.cat([self.weights.t(), bias], dim=0)
 
-        # Compute memristive outputs
+        # Compute the memristive outputs
         outputs = self.memristive_outputs(inputs, weights_and_bias)
         return outputs
 
     def memristive_outputs(self, x, weights_and_bias):
+        """
+        Computes the memristive layer outputs based on voltage, conductance, 
+        and current relationships.
+
+        Args:
+        - x (Tensor): Input tensor with bias included, shape (batch_size, size_in + 1).
+        - weights_and_bias (Tensor): Weights and bias tensor, shape (size_in + 1, size_out).
+
+        Returns:
+        - Tensor: Output tensor of shape (batch_size, size_out).
+        """
         # Voltage calculation
         V = self.k_V * x
 
-        # Conductance scaling
+        # Conductance scaling factors
         max_wb = torch.max(torch.abs(weights_and_bias))
         k_G = (self.G_on - self.G_off) / max_wb
         k_I = self.k_V * k_G
         G_eff = k_G * weights_and_bias
 
-        # Map weights to conductances
-        G_pos = self.G_off + torch.max(G_eff, torch.tensor(0.0))
-        G_neg = self.G_off - torch.min(G_eff, torch.tensor(0.0))
+        # Map weights to positive and negative conductances
+        G_pos = self.G_off + torch.maximum(G_eff, torch.tensor(0.0, device=x.device))
+        G_neg = self.G_off - torch.minimum(G_eff, torch.tensor(0.0, device=x.device))
         G = torch.cat((G_pos[:, :, None], G_neg[:, :, None]), dim=-1).reshape(
             G_pos.size(0), -1
         )
 
+        # Optionally disturb conductance values
         if self.disturb_conductance:
             G = disturb_conductance_fixed(G, self.G_on, true_probability=0.5)
 
         # Compute current
-        I_ind = torch.unsqueeze(V, -1) * torch.unsqueeze(G, 0)
+        I_ind = torch.unsqueeze(V, dim=-1) * torch.unsqueeze(G, dim=0)
         I = torch.sum(I_ind, dim=1)
         I_total = I[:, 0::2] - I[:, 1::2]
 
@@ -79,86 +109,39 @@ class MemristorLinearLayer(nn.Module):
         return y
 
 
-# class StuckDeviceDropout(nn.Module):
-#     def __init__(self, median_range, proportion_stuck=0.1, seed=None):
-#         """
-#         Custom dropout layer to simulate stuck devices in memristive systems.
+class HomeostasisDropout(nn.Module):
+    def __init__(self):
+        """
+        A custom layer that drops the spike output if it has been spiking continuously 
+        over all time steps (across the entire sequence).
+        """
+        super(HomeostasisDropout, self).__init__()
 
-#         Args:
-#             median_range (float): Median value of the conductance range (G_on - G_off).
-#             proportion_stuck (float): Proportion of devices to be stuck.
-#             seed (int, optional): Random seed for reproducibility.
-#         """
-#         super().__init__()
-#         self.median_range = median_range
-#         self.proportion_stuck = proportion_stuck
-#         self.seed = seed
-#         if seed is not None:
-#             torch.manual_seed(seed)
+    def forward(self, spk_rec):
+        """
+        Forward pass that checks if the spikes are repeated across all time steps 
+        and sets those to zero if they are continuously '1' over the entire sequence.
 
-#     def _generate_stuck_pdf(self, size):
-#         """
-#         Generate the probability density function for stuck devices using KDE with truncated normal distributions.
+        Args:
+        - spk_rec: A tensor containing the spikes over time (num_steps, batch_size, num_features).
 
-#         Args:
-#             size (int): Number of devices.
+        Returns:
+        - A tensor with the spikes set to zero if they were '1' continuously across the entire sequence.
+        """
 
-#         Returns:
-#             torch.Tensor: Stuck conductance values.
-#         """
-#         lower, upper = 0, 1
-#         mean, std_dev = 0.5, 0.1  # Assuming normalized range for conductance
+        # The shape of spk_rec is (num_steps, batch_size, num_features)
+        num_steps, batch_size, num_features = spk_rec.shape
 
-#         # Generate truncated normal distribution
-#         a, b = (lower - mean) / std_dev, (upper - mean) / std_dev
-#         stuck_values = truncnorm.rvs(a, b, loc=mean, scale=std_dev, size=size)
+        # Check for continuous spikes across all time steps
+        # Compare each time step with the next one to find continuous sequences of 1s
+        continuous_spikes = (spk_rec[1:] == 1) & (spk_rec[:-1] == 1)  # Shape: (num_steps-1, batch_size, num_features)
 
-#         # Reflect values to mitigate bias from clipping at zero
-#         stuck_values = np.abs(stuck_values)
-#         return torch.tensor(stuck_values, dtype=torch.float32)
+        # We want to drop the spikes that were continuous across all time steps
+        # The spike is dropped if it was '1' in all steps
+        drop_mask = torch.cat([torch.zeros(1, batch_size, num_features, device=spk_rec.device), continuous_spikes], dim=0)
 
-#     def _apply_device_variability(self, values):
-#         """
-#         Apply device-to-device variability using a lognormal distribution.
+        # Set the repeated spikes to zero by applying the drop mask
+        spk_rec = spk_rec * (1 - drop_mask).float()
 
-#         Args:
-#             values (torch.Tensor): Input conductance values.
-
-#         Returns:
-#             torch.Tensor: Modified conductance values with variability.
-#         """
-#         shape = 0.1  # Lognormal shape parameter for variability
-#         scale = 1.0
-#         variability = lognorm.rvs(shape, scale=scale, size=values.size(0))
-#         return values * torch.tensor(variability, dtype=torch.float32)
-
-#     def forward(self, x):
-#         """
-#         Apply the custom dropout mechanism.
-
-#         Args:
-#             x (torch.Tensor): Input tensor.
-
-#         Returns:
-#             torch.Tensor: Output tensor with simulated stuck devices.
-#         """
-#         if not self.training or self.proportion_stuck <= 0:
-#             return x
-
-#         # Determine the number of devices to be stuck
-#         num_devices = x.numel()
-#         num_stuck = int(self.proportion_stuck * num_devices)
-
-#         # Generate stuck values
-#         stuck_values = self._generate_stuck_pdf(num_stuck)
-#         stuck_values = self._apply_device_variability(stuck_values)
-
-#         # Create a mask for stuck devices
-#         stuck_mask = torch.zeros(num_devices, dtype=torch.bool)
-#         stuck_indices = torch.randperm(num_devices)[:num_stuck]
-#         stuck_mask[stuck_indices] = True
-
-#         # Apply the stuck behavior to the input tensor
-#         x_flat = x.flatten()
-#         x_flat[stuck_mask] = stuck_values
-#         return x_flat.view_as(x)
+        # Return only the latest step after applying the drop mask
+        return spk_rec[-1]  # Select the last step in the sequence

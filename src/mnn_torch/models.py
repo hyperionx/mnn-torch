@@ -3,9 +3,8 @@ import torch.nn as nn
 import snntorch as snn
 import torch.nn.functional as F
 
-from mnn_torch.layers import MemristorLinearLayer
+from mnn_torch.layers import MemristorLinearLayer, HomeostasisDropout
 
-# Define a unified SNN model with flexible layer choice
 class MSNN(nn.Module):
     def __init__(self, num_inputs, num_hidden, num_outputs, num_steps, beta, memristive_config):
         super().__init__()
@@ -17,9 +16,16 @@ class MSNN(nn.Module):
         self.fc1, self.lif1 = self._build_layer(num_inputs, num_hidden)
         self.fc2, self.lif2 = self._build_layer(num_hidden, num_outputs)
 
+        # Add the custom drop layer if "homeostasis_threshold" is in the config
+        if "homeostasis_threshold" in self.memristive_config:
+            self.drop_layer = HomeostasisDropout()
+        else:
+            self.drop_layer = None  # No drop layer if "homeostasis_threshold" is not present
+
     def _build_layer(self, in_features, out_features):
         """Helper method to build a linear layer followed by a LIF neuron.
         If 'ideal' is True, use nn.Linear. Otherwise, use MemristorLinearLayer."""
+        
         if self.memristive_config.get("ideal", False):
             fc = nn.Linear(in_features, out_features)
         else:
@@ -30,6 +36,7 @@ class MSNN(nn.Module):
     def forward(self, x):
         # Initialize hidden states for both LIF neurons
         mem1, mem2 = self.lif1.init_leaky(), self.lif2.init_leaky()
+        spk1_rec, mem1_rec = [], []
         spk2_rec, mem2_rec = [], []
 
         for _ in range(self.num_steps):
@@ -37,21 +44,30 @@ class MSNN(nn.Module):
             cur1 = self.fc1(x)
             spk1, mem1 = self.lif1(cur1, mem1)
 
+            # Collect spike outputs
+            spk1_rec.append(spk1)
+            mem1_rec.append(mem1)
+
+            # Apply the drop layer after the first LIF if spk1_rec length exceeds the threshold
+            if (
+                self.drop_layer is not None
+                and len(spk1_rec) >= self.memristive_config["homeostasis_threshold"]
+            ):
+                spk1_window = torch.stack(
+                    spk1_rec[-self.memristive_config["homeostasis_threshold"]:], dim=0
+                )
+                spk1 = self.drop_layer(spk1_window)
+
             # Propagate through the second layer and LIF
             cur2 = self.fc2(spk1)
             spk2, mem2 = self.lif2(cur2, mem2)
 
+            # Collect spike outputs
             spk2_rec.append(spk2)
             mem2_rec.append(mem2)
 
         return torch.stack(spk2_rec, dim=0), torch.stack(mem2_rec, dim=0)
 
-
-import torch
-import torch.nn as nn
-import snntorch as snn
-import torch.nn.functional as F
-from mnn_torch.layers import MemristorLinearLayer
 
 class MCSNN(nn.Module):
     def __init__(

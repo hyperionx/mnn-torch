@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.optimize import curve_fit
 import scipy.constants as const
+import torch
 
 from mnn_torch.devices import load_SiOx_curves
 from mnn_torch.utils import (
@@ -15,15 +16,15 @@ def disturb_conductance_fixed(G, fixed_conductance, true_probability=0.5):
     Disturbs the conductance by randomly replacing values with a fixed conductance.
 
     Args:
-    - G: The original conductance array.
+    - G: The original conductance array (tensor).
     - fixed_conductance: The fixed conductance value to replace randomly selected entries.
     - true_probability: The probability of replacing an entry with the fixed conductance.
 
     Returns:
-    - G: The disturbed conductance array.
+    - G: The disturbed conductance array (tensor).
     """
-    mask = np.random.rand(*G.shape) < true_probability
-    G = np.where(mask, fixed_conductance, G)
+    mask = torch.rand(*G.shape, device=G.device) < true_probability
+    G = torch.where(mask, fixed_conductance, G)
     return G
 
 
