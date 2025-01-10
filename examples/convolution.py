@@ -42,10 +42,10 @@ def main():
         "R": R,
         "c": c,
         "d_epsilon": d_epsilon,
-        "disturb_conductance": False,
+        "disturb_conductance": True,
         "disturb_mode": "fixed",
         "disturbance_probability": 0.1,
-        "homeostasis_dropout": False,
+        "homeostasis_dropout": True,
         "homeostasis_threshold": 10,
     }
 
