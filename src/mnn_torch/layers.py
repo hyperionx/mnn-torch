@@ -5,7 +5,7 @@ import numpy as np
 from mnn_torch.effects import disturb_conductance_fixed, disturb_conductance_device
 
 
-class MemristorLinearLayer(nn.Module):
+class MemristiveLinearLayer(nn.Module):
     """
     Custom memristive linear layer.
     This layer simulates the behavior of memristors, optionally applying
@@ -32,7 +32,6 @@ class MemristorLinearLayer(nn.Module):
         self.size_out = size_out
 
         # Load configuration
-        self.ideal = memristive_config.get("ideal", True)
         self.disturb_conductance = memristive_config.get("disturb_conductance", False)
         self.disturb_mode = memristive_config.get("disturb_mode", "fixed")
         self.disturbance_probability = memristive_config.get(
@@ -46,14 +45,12 @@ class MemristorLinearLayer(nn.Module):
         nn.init.normal_(self.weights, mean=0, std=stdv)
         nn.init.constant_(self.bias, 0)
 
-        if not self.ideal:
-            # Load non-ideal parameters from config
-            self.G_off = memristive_config["G_off"]
-            self.G_on = memristive_config["G_on"]
-            self.R = memristive_config["R"]
-            self.c = memristive_config["c"]
-            self.d_epsilon = memristive_config["d_epsilon"]
-            self.k_V = memristive_config["k_V"]
+        self.G_off = memristive_config["G_off"]
+        self.G_on = memristive_config["G_on"]
+        self.R = memristive_config["R"]
+        self.c = memristive_config["c"]
+        self.d_epsilon = memristive_config["d_epsilon"]
+        self.k_V = memristive_config["k_V"]
 
     def forward(self, x):
         """
@@ -125,6 +122,133 @@ class MemristorLinearLayer(nn.Module):
 
         # Output calculation
         y = I_total / k_I
+        return y
+
+
+class MemristiveConv2d(nn.Module):
+    """
+    Custom memristive 2D convolutional layer.
+    This layer simulates the behavior of memristors, optionally applying
+    disturbances and non-ideal effects based on the provided configuration.
+    """
+
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        kernel_size,
+        stride=1,
+        padding=0,
+        memristive_config=None,
+    ):
+        """
+        Initializes the memristive convolutional layer.
+        """
+        super().__init__()
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.kernel_size = self._to_tuple(kernel_size)
+        self.stride = self._to_tuple(stride)
+        self.padding = self._to_tuple(padding)
+
+        # Load configuration
+        self.ideal = memristive_config.get("ideal", True)
+        self.disturb_conductance = memristive_config.get("disturb_conductance", False)
+        self.disturb_mode = memristive_config.get("disturb_mode", "fixed")
+        self.disturbance_probability = memristive_config.get(
+            "disturbance_probability", 0.1
+        )
+
+        # Initialize weights and biases
+        self.weight = nn.Parameter(
+            torch.Tensor(out_channels, in_channels, *self.kernel_size)
+        )
+        self.bias = nn.Parameter(torch.Tensor(out_channels))
+        stdv = 1 / np.sqrt(in_channels * np.prod(self.kernel_size))
+        nn.init.normal_(self.weight, mean=0, std=stdv)
+        nn.init.constant_(self.bias, 0)
+
+        # Load non-ideal parameters from config
+        self.G_off = memristive_config["G_off"]
+        self.G_on = memristive_config["G_on"]
+        self.R = memristive_config["R"]
+        self.c = memristive_config["c"]
+        self.d_epsilon = memristive_config["d_epsilon"]
+        self.k_V = memristive_config["k_V"]
+
+    def _to_tuple(self, value):
+        """Ensures kernel size and padding are tuples."""
+        return value if isinstance(value, tuple) else (value, value)
+
+    def forward(self, x):
+        """
+        Forward pass for the memristive convolutional layer.
+
+        Args:
+        - x (Tensor): Input tensor of shape (batch_size, in_channels, height, width).
+
+        Returns:
+        - Tensor: Output tensor of shape (batch_size, out_channels, new_height, new_width).
+        """
+        device = x.device
+
+        # Memristive weight computation
+        weights = self.memristive_weights(self.weight)
+
+        # Apply convolution
+        output = nn.functional.conv2d(x, weights, self.bias, self.stride, self.padding)
+        return output
+
+    def memristive_weights(self, weights):
+        """
+        Adjusts weights to simulate memristive properties.
+
+        Args:
+        - weights (Tensor): Original weights of shape (out_channels, in_channels, kernel_height, kernel_width).
+
+        Returns:
+        - Tensor: Adjusted weights with memristive properties.
+        """
+        if self.ideal:
+            return weights
+
+        # Voltage-based scaling (example)
+        V = (
+            self.k_V * weights
+        )  # Shape: (out_channels, in_channels, kernel_height, kernel_width)
+        max_w = torch.max(torch.abs(weights))
+        k_G = (self.G_on - self.G_off) / max_w
+        k_I = self.k_V * k_G
+        G_eff = k_G * weights
+
+        # Map weights to conductance (pos and neg parts)
+        G_pos = self.G_off + torch.maximum(
+            G_eff, torch.tensor(0.0, device=weights.device)
+        )
+        G_neg = self.G_off - torch.minimum(
+            G_eff, torch.tensor(0.0, device=weights.device)
+        )
+
+        # Combine G_pos and G_neg into one tensor of the correct shape (out_channels, in_channels, kernel_height, kernel_width)
+        G = G_pos - G_neg  # Simply subtracting for now to get a single tensor back
+
+        # Disturb conductance if necessary
+        if self.disturb_conductance:
+            if self.disturb_mode == "fixed":
+                G = disturb_conductance_fixed(
+                    G, self.G_on, true_probability=self.disturbance_probability
+                )
+            elif self.disturb_mode == "device":
+                G = disturb_conductance_device(
+                    G,
+                    self.G_on,
+                    self.G_off,
+                    true_probability=self.disturbance_probability,
+                )
+
+        # Compute the final current and return adjusted weights
+        I_total = G * V  # Apply the conductance adjustment
+        y = I_total / k_I  # Final adjusted weights
         return y
 
 

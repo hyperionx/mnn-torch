@@ -3,7 +3,7 @@ import torch.nn as nn
 import snntorch as snn
 import torch.nn.functional as F
 
-from mnn_torch.layers import MemristorLinearLayer, HomeostasisDropout
+from mnn_torch.layers import MemristiveLinearLayer, MemristiveConv2d, HomeostasisDropout
 
 
 class MSNN(nn.Module):
@@ -28,12 +28,14 @@ class MSNN(nn.Module):
 
     def _build_layer(self, in_features, out_features):
         """Helper method to build a linear layer followed by a LIF neuron.
-        If 'ideal' is True, use nn.Linear. Otherwise, use MemristorLinearLayer."""
+        If 'ideal' is True, use nn.Linear. Otherwise, use MemristiveLinearLayer."""
 
         if self.memristive_config.get("ideal", False):
             fc = nn.Linear(in_features, out_features)
         else:
-            fc = MemristorLinearLayer(in_features, out_features, self.memristive_config)
+            fc = MemristiveLinearLayer(
+                in_features, out_features, self.memristive_config
+            )
         lif = snn.Leaky(beta=self.beta)
         return fc, lif
 
@@ -83,27 +85,83 @@ class MCSNN(nn.Module):
         num_conv1,
         num_conv2,
         max_pooling,
-        num_hidden,
         num_outputs,
         memristive_config,
+        input_shape=(1, 28, 28),  # Default to MNIST input size
+        stride=1,  # Add stride parameter
+        padding=0,  # Add padding parameter
     ):
         super().__init__()
 
+        self.stride = stride
+        self.num_conv1 = num_conv1
+        self.num_conv2 = num_conv2
         self.batch_size = batch_size
         self.max_pooling = max_pooling
+        self.memristive_config = memristive_config
 
-        # Initialize convolutional layers directly
-        self.conv1 = nn.Conv2d(1, num_conv1, num_kernels)
+        # Initialize convolutional layers
+        self.conv1 = MemristiveConv2d(
+            in_channels=input_shape[0],
+            out_channels=num_conv1,
+            kernel_size=num_kernels,
+            stride=stride,
+            padding=padding,
+            memristive_config=self.memristive_config,
+        )
         self.lif1 = snn.Leaky(beta=beta, spike_grad=spike_grad)
-        self.conv2 = nn.Conv2d(num_conv1, num_conv2, num_kernels)
+
+        self.conv2 = MemristiveConv2d(
+            in_channels=num_conv1,
+            out_channels=num_conv2,
+            kernel_size=num_kernels,
+            stride=stride,
+            padding=padding,
+            memristive_config=self.memristive_config,
+        )
         self.lif2 = snn.Leaky(beta=beta, spike_grad=spike_grad)
+
+        # Calculate the flattened size after convolutions and pooling
+        self.num_hidden = self._calculate_hidden_size(
+            input_shape, num_kernels, stride, padding, max_pooling
+        )
 
         # Initialize fully connected layer and LIF neuron based on configuration
         if memristive_config.get("ideal", False):
-            self.fc1 = nn.Linear(num_hidden, num_outputs)
+            self.fc1 = nn.Linear(self.num_hidden, num_outputs)
         else:
-            self.fc1 = MemristorLinearLayer(num_hidden, num_outputs, memristive_config)
+            self.fc1 = MemristiveLinearLayer(
+                self.num_hidden, num_outputs, memristive_config
+            )
         self.lif3 = snn.Leaky(beta=beta, spike_grad=spike_grad)
+
+    def _calculate_hidden_size(
+        self, input_shape, kernel_size, stride, padding, max_pooling
+    ):
+        """
+        Calculates the size of the flattened tensor after convolutional and pooling layers.
+
+        Args:
+        - input_shape (tuple): Shape of the input tensor (channels, height, width).
+        - kernel_size (int): Size of the convolutional kernel.
+        - stride (int): Stride of the convolution.
+        - padding (int): Padding size.
+        - max_pooling (int): Max pooling size.
+
+        Returns:
+        - int: Flattened tensor size.
+        """
+        channels, height, width = input_shape
+
+        # First convolutional layer
+        height = ((height + 2 * padding - kernel_size) // stride + 1) // max_pooling
+        width = ((width + 2 * padding - kernel_size) // stride + 1) // max_pooling
+
+        # Second convolutional layer
+        height = ((height + 2 * padding - kernel_size) // stride + 1) // max_pooling
+        width = ((width + 2 * padding - kernel_size) // stride + 1) // max_pooling
+
+        return height * width * self.num_conv2
 
     def forward(self, x):
         # Initialize hidden states

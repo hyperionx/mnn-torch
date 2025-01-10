@@ -57,21 +57,25 @@ def main():
     # Network Architecture parameters
     num_kernels = 5
     num_conv1 = 12
-    num_conv2 = 64
+    num_conv2 = 32
     max_pooling = 2
     num_hidden = num_conv2 * 4 * 4  # Adjust according to your layer sizes
     num_outputs = 10
 
     # Memristive configuration (set "ideal" to False or True for different behavior)
     PF_config = {
-        "k_V": 0.5,
         "ideal": False,
-        "disturb_conductance": False,
+        "k_V": 0.5,
         "G_off": G_off,
         "G_on": G_on,
         "R": R,
         "c": c,
         "d_epsilon": d_epsilon,
+        "disturb_conductance": False,
+        "disturb_mode": "fixed",
+        "disturbance_probability": 0.1,
+        "homeostasis_dropout": False,
+        "homeostasis_threshold": 10,
     }
 
     # Initialize model
@@ -83,7 +87,6 @@ def main():
         num_conv1=num_conv1,
         num_conv2=num_conv2,
         max_pooling=max_pooling,
-        num_hidden=num_hidden,
         num_outputs=num_outputs,
         memristive_config=PF_config,
     ).to(device)
