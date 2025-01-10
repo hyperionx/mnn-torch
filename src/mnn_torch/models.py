@@ -89,76 +89,77 @@ class MCSNN(nn.Module):
         num_outputs,
         memristive_config,
         input_shape=(1, 28, 28),  # Default to MNIST input size
-        stride=1,  # Add stride parameter
-        padding=0,  # Add padding parameter
+        stride=1,
+        padding=0,
     ):
         super().__init__()
 
+        # Basic configurations
         self.num_steps = num_steps
+        self.batch_size = batch_size
         self.stride = stride
         self.num_conv1 = num_conv1
         self.num_conv2 = num_conv2
-        self.batch_size = batch_size
         self.max_pooling = max_pooling
         self.memristive_config = memristive_config
         self.ideal = memristive_config.get("ideal", False)  # Check for the ideal config
 
-        # Choose between regular Conv2d or MemristiveConv2d based on the 'ideal' config
-        if self.ideal:
-            self.conv1 = nn.Conv2d(
-                in_channels=input_shape[0],
-                out_channels=num_conv1,
-                kernel_size=num_kernels,
-                stride=stride,
-                padding=padding,
-            )
-            self.conv2 = nn.Conv2d(
-                in_channels=num_conv1,
-                out_channels=num_conv2,
-                kernel_size=num_kernels,
-                stride=stride,
-                padding=padding,
-            )
-        else:
-            self.conv1 = MemristiveConv2d(
-                in_channels=input_shape[0],
-                out_channels=num_conv1,
-                kernel_size=num_kernels,
-                stride=stride,
-                padding=padding,
-                memristive_config=self.memristive_config,
-            )
-            self.conv2 = MemristiveConv2d(
-                in_channels=num_conv1,
-                out_channels=num_conv2,
-                kernel_size=num_kernels,
-                stride=stride,
-                padding=padding,
-                memristive_config=self.memristive_config,
-            )
+        # Define convolutional layers (either regular or memristive)
+        self.conv1 = self._get_conv_layer(
+            input_shape[0], num_conv1, num_kernels, stride, padding
+        )
+        self.conv2 = self._get_conv_layer(
+            num_conv1, num_conv2, num_kernels, stride, padding
+        )
 
-        # Define the Leaky Integrate-and-Fire (LIF) neurons for each layer
+        # Define Leaky Integrate-and-Fire (LIF) neurons for each layer
         self.lif1 = snn.Leaky(beta=beta, spike_grad=spike_grad)
         self.lif2 = snn.Leaky(beta=beta, spike_grad=spike_grad)
+        self.lif3 = snn.Leaky(beta=beta, spike_grad=spike_grad)
 
-        # Calculate the flattened size after convolutions and pooling
+        # Calculate flattened size after convolutions and pooling
         self.num_hidden = self._calculate_hidden_size(
             input_shape, num_kernels, stride, padding, max_pooling
         )
 
-        # Initialize fully connected layer and LIF neuron based on configuration
+        # Define the fully connected layer (either regular or memristive)
+        self.fc1 = self._get_fc_layer(self.num_hidden, num_outputs)
+
+    def _get_conv_layer(self, in_channels, out_channels, kernel_size, stride, padding):
+        """
+        Helper function to return either a standard Conv2d or MemristiveConv2d.
+        """
         if self.ideal:
-            self.fc1 = nn.Linear(self.num_hidden, num_outputs)
-        else:
-            self.fc1 = MemristiveLinearLayer(
-                self.num_hidden, num_outputs, memristive_config
+            return nn.Conv2d(
+                in_channels, out_channels, kernel_size, stride=stride, padding=padding
             )
-        self.lif3 = snn.Leaky(beta=beta, spike_grad=spike_grad)
+        else:
+            return MemristiveConv2d(
+                in_channels,
+                out_channels,
+                kernel_size,
+                stride,
+                padding,
+                self.memristive_config,
+            )
+
+    def _get_fc_layer(self, in_features, out_features):
+        """
+        Helper function to return either a standard Linear layer or a MemristiveLinearLayer.
+        """
+        if self.ideal:
+            return nn.Linear(in_features, out_features)
+        else:
+            return MemristiveLinearLayer(
+                in_features, out_features, self.memristive_config
+            )
 
     def _calculate_hidden_size(
         self, input_shape, kernel_size, stride, padding, max_pooling
     ):
-        """Calculates the size of the flattened tensor after convolutional and pooling layers."""
+        """
+        Calculates the size of the flattened tensor after convolutional and pooling layers.
+        """
         channels, height, width = input_shape
 
         # First convolutional layer
@@ -172,43 +173,37 @@ class MCSNN(nn.Module):
         return height * width * self.num_conv2
 
     def forward(self, x):
-        # Initialize hidden states
-        mem1 = self.lif1.init_leaky()
-        mem2 = self.lif2.init_leaky()
-        mem3 = self.lif3.init_leaky()
+        # Initialize hidden states for LIF neurons
+        mem1, mem2, mem3 = (
+            self.lif1.init_leaky(),
+            self.lif2.init_leaky(),
+            self.lif3.init_leaky(),
+        )
 
+        # Prepare to collect spikes and membrane potentials
         spk1_rec, mem1_rec = [], []
         spk2_rec, mem2_rec = [], []
         spk3_rec, mem3_rec = [], []
 
+        # Iterate over time steps
         for _ in range(self.num_steps):
-            # Forward pass through convolutional layers and LIF neurons
-            if self.ideal:
-                cur1 = F.max_pool2d(self.conv1(x), self.max_pooling)
-            else:
-                cur1 = F.max_pool2d(self.conv1(x), self.max_pooling)
+            # First convolutional layer + LIF neuron
+            cur1 = F.max_pool2d(self.conv1(x), self.max_pooling)
             spk1, mem1 = self.lif1(cur1, mem1)
-
-            # Collect spike outputs for conv1
             spk1_rec.append(spk1)
             mem1_rec.append(mem1)
 
-            if self.ideal:
-                cur2 = F.max_pool2d(self.conv2(spk1), self.max_pooling)
-            else:
-                cur2 = F.max_pool2d(self.conv2(spk1), self.max_pooling)
+            # Second convolutional layer + LIF neuron
+            cur2 = F.max_pool2d(self.conv2(spk1), self.max_pooling)
             spk2, mem2 = self.lif2(cur2, mem2)
-
-            # Collect spike outputs for conv2
             spk2_rec.append(spk2)
             mem2_rec.append(mem2)
 
-            # Flatten output from convolutional layers and pass through fully connected layer
+            # Fully connected layer + LIF neuron
             cur3 = self.fc1(spk2.view(self.batch_size, -1))
             spk3, mem3 = self.lif3(cur3, mem3)
-
-            # Collect spike outputs for fc layer
             spk3_rec.append(spk3)
             mem3_rec.append(mem3)
 
+        # Stack spike and membrane potential outputs along the time axis
         return torch.stack(spk3_rec, dim=0), torch.stack(mem3_rec, dim=0)

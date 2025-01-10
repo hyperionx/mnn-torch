@@ -35,7 +35,7 @@ def main():
 
     # Memristive configuration
     PF_config = {
-        "ideal": True,
+        "ideal": False,
         "k_V": 0.5,
         "G_off": G_off,
         "G_on": G_on,
