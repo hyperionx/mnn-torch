@@ -80,6 +80,7 @@ class MCSNN(nn.Module):
         self,
         beta,
         spike_grad,
+        num_steps,
         batch_size,
         num_kernels,
         num_conv1,
@@ -93,6 +94,7 @@ class MCSNN(nn.Module):
     ):
         super().__init__()
 
+        self.num_steps = num_steps
         self.stride = stride
         self.num_conv1 = num_conv1
         self.num_conv2 = num_conv2
@@ -108,14 +110,14 @@ class MCSNN(nn.Module):
                 out_channels=num_conv1,
                 kernel_size=num_kernels,
                 stride=stride,
-                padding=padding
+                padding=padding,
             )
             self.conv2 = nn.Conv2d(
                 in_channels=num_conv1,
                 out_channels=num_conv2,
                 kernel_size=num_kernels,
                 stride=stride,
-                padding=padding
+                padding=padding,
             )
         else:
             self.conv1 = MemristiveConv2d(
@@ -124,7 +126,7 @@ class MCSNN(nn.Module):
                 kernel_size=num_kernels,
                 stride=stride,
                 padding=padding,
-                memristive_config=self.memristive_config
+                memristive_config=self.memristive_config,
             )
             self.conv2 = MemristiveConv2d(
                 in_channels=num_conv1,
@@ -132,7 +134,7 @@ class MCSNN(nn.Module):
                 kernel_size=num_kernels,
                 stride=stride,
                 padding=padding,
-                memristive_config=self.memristive_config
+                memristive_config=self.memristive_config,
             )
 
         # Define the Leaky Integrate-and-Fire (LIF) neurons for each layer
@@ -156,19 +158,7 @@ class MCSNN(nn.Module):
     def _calculate_hidden_size(
         self, input_shape, kernel_size, stride, padding, max_pooling
     ):
-        """
-        Calculates the size of the flattened tensor after convolutional and pooling layers.
-
-        Args:
-        - input_shape (tuple): Shape of the input tensor (channels, height, width).
-        - kernel_size (int): Size of the convolutional kernel.
-        - stride (int): Stride of the convolution.
-        - padding (int): Padding size.
-        - max_pooling (int): Max pooling size.
-
-        Returns:
-        - int: Flattened tensor size.
-        """
+        """Calculates the size of the flattened tensor after convolutional and pooling layers."""
         channels, height, width = input_shape
 
         # First convolutional layer
@@ -187,22 +177,38 @@ class MCSNN(nn.Module):
         mem2 = self.lif2.init_leaky()
         mem3 = self.lif3.init_leaky()
 
-        # Forward pass through convolutional layers and LIF neurons
-        if self.ideal:
-            cur1 = F.max_pool2d(self.conv1(x), self.max_pooling)
-        else:
-            cur1 = F.max_pool2d(self.conv1(x), self.max_pooling)
-        spk1, mem1 = self.lif1(cur1, mem1)
+        spk1_rec, mem1_rec = [], []
+        spk2_rec, mem2_rec = [], []
+        spk3_rec, mem3_rec = [], []
 
-        if self.ideal:
-            cur2 = F.max_pool2d(self.conv2(spk1), self.max_pooling)
-        else:
-            cur2 = F.max_pool2d(self.conv2(spk1), self.max_pooling)
-        spk2, mem2 = self.lif2(cur2, mem2)
+        for _ in range(self.num_steps):
+            # Forward pass through convolutional layers and LIF neurons
+            if self.ideal:
+                cur1 = F.max_pool2d(self.conv1(x), self.max_pooling)
+            else:
+                cur1 = F.max_pool2d(self.conv1(x), self.max_pooling)
+            spk1, mem1 = self.lif1(cur1, mem1)
 
-        # Flatten output from convolutional layers and pass through fully connected layer
-        cur3 = self.fc1(spk2.view(self.batch_size, -1))
-        spk3, mem3 = self.lif3(cur3, mem3)
+            # Collect spike outputs for conv1
+            spk1_rec.append(spk1)
+            mem1_rec.append(mem1)
 
-        return spk3, mem3
+            if self.ideal:
+                cur2 = F.max_pool2d(self.conv2(spk1), self.max_pooling)
+            else:
+                cur2 = F.max_pool2d(self.conv2(spk1), self.max_pooling)
+            spk2, mem2 = self.lif2(cur2, mem2)
 
+            # Collect spike outputs for conv2
+            spk2_rec.append(spk2)
+            mem2_rec.append(mem2)
+
+            # Flatten output from convolutional layers and pass through fully connected layer
+            cur3 = self.fc1(spk2.view(self.batch_size, -1))
+            spk3, mem3 = self.lif3(cur3, mem3)
+
+            # Collect spike outputs for fc layer
+            spk3_rec.append(spk3)
+            mem3_rec.append(mem3)
+
+        return torch.stack(spk3_rec, dim=0), torch.stack(mem3_rec, dim=0)
