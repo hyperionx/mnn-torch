@@ -158,8 +158,8 @@ class MCSNN(BaseSNN):
 
         # Initialize HomeostasisDropout layers for each LIF layer before the output
         if self.memristive_config.get("homeostasis_dropout", False):
-            self.homeostasis_dropout1 = HomeostasisDropout()  # For the first LIF layer
-            self.homeostasis_dropout2 = HomeostasisDropout()  # For the second LIF layer
+            self.homeostasis_dropout1 = HomeostasisDropout()
+            self.homeostasis_dropout2 = HomeostasisDropout()
         else:
             self.homeostasis_dropout1 = None
             self.homeostasis_dropout2 = None
