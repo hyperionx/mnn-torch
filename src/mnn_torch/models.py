@@ -99,26 +99,44 @@ class MCSNN(nn.Module):
         self.batch_size = batch_size
         self.max_pooling = max_pooling
         self.memristive_config = memristive_config
+        self.ideal = memristive_config.get("ideal", False)  # Check for the ideal config
 
-        # Initialize convolutional layers
-        self.conv1 = MemristiveConv2d(
-            in_channels=input_shape[0],
-            out_channels=num_conv1,
-            kernel_size=num_kernels,
-            stride=stride,
-            padding=padding,
-            memristive_config=self.memristive_config,
-        )
+        # Choose between regular Conv2d or MemristiveConv2d based on the 'ideal' config
+        if self.ideal:
+            self.conv1 = nn.Conv2d(
+                in_channels=input_shape[0],
+                out_channels=num_conv1,
+                kernel_size=num_kernels,
+                stride=stride,
+                padding=padding
+            )
+            self.conv2 = nn.Conv2d(
+                in_channels=num_conv1,
+                out_channels=num_conv2,
+                kernel_size=num_kernels,
+                stride=stride,
+                padding=padding
+            )
+        else:
+            self.conv1 = MemristiveConv2d(
+                in_channels=input_shape[0],
+                out_channels=num_conv1,
+                kernel_size=num_kernels,
+                stride=stride,
+                padding=padding,
+                memristive_config=self.memristive_config
+            )
+            self.conv2 = MemristiveConv2d(
+                in_channels=num_conv1,
+                out_channels=num_conv2,
+                kernel_size=num_kernels,
+                stride=stride,
+                padding=padding,
+                memristive_config=self.memristive_config
+            )
+
+        # Define the Leaky Integrate-and-Fire (LIF) neurons for each layer
         self.lif1 = snn.Leaky(beta=beta, spike_grad=spike_grad)
-
-        self.conv2 = MemristiveConv2d(
-            in_channels=num_conv1,
-            out_channels=num_conv2,
-            kernel_size=num_kernels,
-            stride=stride,
-            padding=padding,
-            memristive_config=self.memristive_config,
-        )
         self.lif2 = snn.Leaky(beta=beta, spike_grad=spike_grad)
 
         # Calculate the flattened size after convolutions and pooling
@@ -127,7 +145,7 @@ class MCSNN(nn.Module):
         )
 
         # Initialize fully connected layer and LIF neuron based on configuration
-        if memristive_config.get("ideal", False):
+        if self.ideal:
             self.fc1 = nn.Linear(self.num_hidden, num_outputs)
         else:
             self.fc1 = MemristiveLinearLayer(
@@ -170,10 +188,16 @@ class MCSNN(nn.Module):
         mem3 = self.lif3.init_leaky()
 
         # Forward pass through convolutional layers and LIF neurons
-        cur1 = F.max_pool2d(self.conv1(x), self.max_pooling)
+        if self.ideal:
+            cur1 = F.max_pool2d(self.conv1(x), self.max_pooling)
+        else:
+            cur1 = F.max_pool2d(self.conv1(x), self.max_pooling)
         spk1, mem1 = self.lif1(cur1, mem1)
 
-        cur2 = F.max_pool2d(self.conv2(spk1), self.max_pooling)
+        if self.ideal:
+            cur2 = F.max_pool2d(self.conv2(spk1), self.max_pooling)
+        else:
+            cur2 = F.max_pool2d(self.conv2(spk1), self.max_pooling)
         spk2, mem2 = self.lif2(cur2, mem2)
 
         # Flatten output from convolutional layers and pass through fully connected layer
@@ -181,3 +205,4 @@ class MCSNN(nn.Module):
         spk3, mem3 = self.lif3(cur3, mem3)
 
         return spk3, mem3
+
