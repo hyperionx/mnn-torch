@@ -273,7 +273,7 @@ class HomeostasisDropout(nn.Module):
         """
 
         # The shape of spk_rec is (num_steps, batch_size, num_features)
-        num_steps, batch_size, num_features = spk_rec.shape
+        num_steps, batch_size, *feature_dims = spk_rec.shape
 
         # Check for continuous spikes across all time steps
         # Compare each time step with the next one to find continuous sequences of 1s
@@ -285,13 +285,13 @@ class HomeostasisDropout(nn.Module):
         # The spike is dropped if it was '1' in all steps
         drop_mask = torch.cat(
             [
-                torch.zeros(1, batch_size, num_features, device=spk_rec.device),
+                torch.zeros(1, batch_size, *feature_dims, device=spk_rec.device),
                 continuous_spikes,
             ],
             dim=0,
         )
 
-        # Set the repeated spikes to zero by applying the drop mask
+        # Drop the spikes that were continuous across all time steps by applying the drop mask
         spk_rec = spk_rec * (1 - drop_mask).float()
 
         # Return only the latest step after applying the drop mask
