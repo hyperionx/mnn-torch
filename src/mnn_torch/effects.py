@@ -100,13 +100,14 @@ def compute_PooleFrenkel_current(V, c, d_epsilon):
     """
     V_abs = np.abs(V)
     V_sign = np.sign(V)
+    term = np.maximum(const.elementary_charge * V_abs / (const.pi * d_epsilon), 1e-18)
     I = (
         V_sign
         * c
         * V_abs
         * np.exp(
             const.elementary_charge
-            * np.sqrt(const.elementary_charge * V_abs / (const.pi * d_epsilon) + 1e-18)
+            * np.sqrt(term)
             / (const.Boltzmann * (const.zero_Celsius + 20.0))
         )
     )
@@ -174,13 +175,26 @@ def compute_PooleFrenkel_relationship(V, I, voltage_step=0.005, ref_voltage=0.1)
         i = I[idx, :]
 
         # Compute resistance at the reference voltage
-        r = v[ref_idx] / i[ref_idx]
-        R[idx] = r
+        if i[ref_idx] == 0:  # Avoid division by zero
+            R[idx] = np.inf
+        else:
+            R[idx] = v[ref_idx] / i[ref_idx]
 
         # Fit the Poole-Frenkel current model
-        popt, _ = curve_fit(compute_PooleFrenkel_current, v, i, p0=[1e-5, 1e-16])
-        c[idx] = popt[0]
-        d_epsilon[idx] = popt[1]
+        try:
+            popt, _ = curve_fit(
+                compute_PooleFrenkel_current,
+                v,
+                i,
+                p0=[1e-5, 1e-16],
+                bounds=([1e-8, 1e-18], [1e-3, 1e-14]),
+                maxfev=10000,  # Increase iterations if needed
+            )
+            c[idx] = popt[0]
+            d_epsilon[idx] = popt[1]
+        except RuntimeError as e:
+            print(f"Curve fit failed for curve {idx}: {e}")
+            c[idx], d_epsilon[idx] = np.nan, np.nan
 
     # Sort the results
     R, c, d_epsilon, V, I = sort_multiple_arrays(R, c, d_epsilon, V, I)
