@@ -226,4 +226,4 @@ class MCSNN(BaseSNN):
             spk3_rec.append(spk3)
             mem3_rec.append(mem3)
 
-        return torch.stack(spk3_rec, dim=0), torch.stack(mem3_rec, dim=0)
+        return torch.stack(spk3_rec), torch.stack(mem3_rec), torch.stack(spk2_rec)

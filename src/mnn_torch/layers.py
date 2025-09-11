@@ -37,6 +37,7 @@ class MemristiveLinearLayer(nn.Module):
         self.disturbance_probability = memristive_config.get(
             "disturbance_probability", 0.1
         )
+        self.homeostasis_dropout = memristive_config.get("homeostasis_dropout", False)
 
         # Initialize weights and biases
         self.weights = nn.Parameter(torch.Tensor(size_out, size_in))
@@ -104,7 +105,7 @@ class MemristiveLinearLayer(nn.Module):
         # Disturb conductance based on the selected mode
         if self.disturb_conductance:
             if self.disturb_mode == "fixed":
-                G = disturb_conductance_fixed(
+                G, mask = disturb_conductance_fixed(
                     G, self.G_on, true_probability=self.disturbance_probability
                 )
             elif self.disturb_mode == "device":
@@ -114,6 +115,9 @@ class MemristiveLinearLayer(nn.Module):
                     self.G_off,
                     true_probability=self.disturbance_probability,
                 )
+
+            if self.homeostasis_dropout:
+                G[mask] = 0
 
         # Compute current
         I_ind = torch.unsqueeze(V, dim=-1) * torch.unsqueeze(G, dim=0)
@@ -158,6 +162,7 @@ class MemristiveConv2d(nn.Module):
         self.disturbance_probability = memristive_config.get(
             "disturbance_probability", 0.1
         )
+        self.homeostasis_dropout = memristive_config.get("homeostasis_dropout", False)
 
         # Initialize weights and biases
         self.weight = nn.Parameter(
@@ -235,7 +240,7 @@ class MemristiveConv2d(nn.Module):
         # Disturb conductance if necessary
         if self.disturb_conductance:
             if self.disturb_mode == "fixed":
-                G = disturb_conductance_fixed(
+                G, mask = disturb_conductance_fixed(
                     G, self.G_on, true_probability=self.disturbance_probability
                 )
             elif self.disturb_mode == "device":
@@ -245,6 +250,8 @@ class MemristiveConv2d(nn.Module):
                     self.G_off,
                     true_probability=self.disturbance_probability,
                 )
+            if self.homeostasis_dropout:
+                G[mask] = 0
 
         # Compute the final current and return adjusted weights
         I_total = G * V  # Apply the conductance adjustment

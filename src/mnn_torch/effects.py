@@ -23,10 +23,11 @@ def disturb_conductance_fixed(G, fixed_conductance, true_probability=0.5):
 
     Returns:
     - G: The disturbed conductance array (tensor).
+    - mask: The boolean mask indicating which values were replaced.
     """
     mask = torch.rand(*G.shape, device=G.device) < true_probability
     G = torch.where(mask, fixed_conductance, G)
-    return G
+    return G, mask
 
 
 def disturb_conductance_device(G, G_on, G_off, true_probability=0.1):
