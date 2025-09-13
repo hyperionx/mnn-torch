@@ -1,0 +1,25 @@
+# Include documentation
+include README.md
+include LICENSE
+include CHANGELOG.rst
+include CONTRIBUTING.rst
+include AUTHORS.rst
+
+# Include examples
+recursive-include examples *.py *.ipynb *.md
+
+# Include tests
+recursive-include tests *.py
+
+# Include docs
+recursive-include docs *.rst *.py *.txt Makefile
+
+# Exclude unnecessary files
+exclude uv.lock
+exclude .python-version
+exclude main.py
+recursive-exclude data *
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]
+recursive-exclude * .DS_Store
+recursive-exclude * .git*

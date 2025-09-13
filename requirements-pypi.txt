@@ -1,0 +1,11 @@
+# Core dependencies for PyPI package
+torch>=2.8.0
+torchvision>=0.23.0
+numpy>=2.2.6
+scipy>=1.14.0
+scikit-learn>=1.7.2
+snntorch>=0.9.4
+
+# Optional dependencies for development and examples
+jupyter>=1.1.1
+matplotlib>=3.10.6
