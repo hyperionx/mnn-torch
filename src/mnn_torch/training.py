@@ -1,6 +1,6 @@
 """Training, config, and fault-recovery sweep logic for the memristive SNN studies.
 
-This module owns the *compute* for the Chapter 7 / APL ML homeostatic
+This module owns the *compute* for the publication-scale homeostatic
 fault-recovery study and its two diagnostic slices, woven beside
 :mod:`mnn_torch.models` / :mod:`mnn_torch.effects` (which own the device
 primitives). Nothing here plots inside a core and nothing writes files inside a

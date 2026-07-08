@@ -104,7 +104,7 @@ def sample_device_fault(shape, G_on, G_off, true_probability=0.1, sigma_g=0.5,
                         device="cpu", generator=None, stuck_polarity="split"):
     """Draw a *fixed* device-fault realisation, once, for a conductance array.
 
-    This implements the Chapter-6 / Section-6.3 fault protocol, in which the
+    This implements the manuscript fault protocol, in which the
     stuck-device pattern and the device-to-device (D2D) programming spread are
     sampled ONCE per training run and then held fixed, exactly as a physically
     programmed crossbar would behave: a device that is stuck, or programmed off

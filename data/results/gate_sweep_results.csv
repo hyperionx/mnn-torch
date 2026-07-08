@@ -1,0 +1,7 @@
+commit,seed,epochs,num_steps,train_subset,disturb_mode,stuck_polarity,prob,no_homeo,homeo,recovery
+c877221,0,1,5,512,device_fixed,on,0.000,9.18,9.57,0.39
+c877221,0,1,5,512,device_fixed,on,0.200,7.81,7.42,-0.39
+c877221,0,1,5,512,device_fixed,on,0.400,9.77,9.57,-0.20
+c877221,0,1,5,512,device_fixed,off,0.000,9.18,9.57,0.39
+c877221,0,1,5,512,device_fixed,off,0.200,2.93,3.32,0.39
+c877221,0,1,5,512,device_fixed,off,0.400,4.88,4.69,-0.20

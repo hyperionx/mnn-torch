@@ -45,7 +45,7 @@ def data_dir() -> Path:
 
 
 def results_dir() -> Path:
-    """``data/results`` -- the temporal/store-recall/homeostasis grids the notebooks replay."""
+    """``data/results`` -- optional full-sweep caches used only when explicitly requested."""
     p = data_dir() / "results"
     p.mkdir(parents=True, exist_ok=True)
     return p

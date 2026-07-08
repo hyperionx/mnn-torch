@@ -16,10 +16,10 @@ def beta_from_tau_leak(tau_leak, dt):
     A leaky integrator with time constant :math:`\tau` decays over one timestep of
     length :math:`dt` by the factor :math:`\beta = \exp(-dt/\tau)`. This is the SAME
     exponentially-leaky state, and the SAME :math:`\tau_{\mathrm{leak}}` (trap-discharge
-    time, :math:`R_{\mathrm{leak}}C`), that Chapter 5/7 identifies as the eligibility
-    trace of reward-modulated learning. Using it here makes the neuron's temporal
+    time, :math:`R_{\mathrm{leak}}C`), used as the eligibility
+    trace in the reward-modulated learning study. Using it here makes the neuron's temporal
     membrane the device's own relaxation: one measured material timescale instantiates
-    BOTH the RL eligibility trace and the spiking-classifier's temporal integrator --
+    both the reinforcement-learning eligibility trace and the spiking-classifier's temporal integrator --
     the leaky-integrator primitive the two share. ``beta`` is clamped to ``[0, 1)`` as
     snnTorch requires.
     """
@@ -33,7 +33,8 @@ class DeviceLeaky(snn.Leaky):
     ``tau_leak`` rather than a free hyperparameter: ``beta = exp(-dt/tau_leak)``
     (see :func:`beta_from_tau_leak`). Semantically identical to ``snn.Leaky`` -- it
     only fixes where ``beta`` comes from -- so it is a drop-in whose membrane dynamics
-    are device-grounded, matching the eligibility-trace substrate of the RL chapter."""
+    are device-grounded, matching the eligibility-trace substrate used in the
+    companion reinforcement-learning experiments."""
 
     def __init__(self, tau_leak, dt, spike_grad=None, **kwargs):
         super().__init__(beta=beta_from_tau_leak(tau_leak, dt),
@@ -244,7 +245,7 @@ class TemporalMSNN(BaseSNN):
     layer sees the ``t``-th sample of the input (the per-channel vector at that time),
     so spike timing and membrane dynamics encode the signal's temporal/spectral
     structure. This is the SNN capability a flattened static encoding discards, and it
-    ties to the thesis's retention theme: the device's slow relaxation integrates the
+    ties to the retention study: the device's slow relaxation integrates the
     streamed signal over time.
 
     Input ``x`` has shape ``(T, batch, num_inputs)`` where T is the number of input

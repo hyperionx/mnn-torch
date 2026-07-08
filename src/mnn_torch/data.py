@@ -2,14 +2,14 @@
 
 Two dataset paths feed the memristive spiking-network studies:
 
-* **MNIST** -- the fault-recovery / homeostasis sweeps (Chapter 7 / APL ML).
+* **MNIST** -- the fault-recovery / homeostasis sweeps.
   :func:`ensure_mnist` downloads it once (into :func:`mnn_torch.paths.data_dir`
   by default) so that pooled worker processes can open it with ``download=False``;
   :func:`mnist_loaders` builds seeded train/test ``DataLoader`` pairs, optionally
   subsetting for a fast smoke run.
 
 * **BCI Competition IV-2a** (BNCI2014_001, 4-class motor imagery) -- the
-  biosignal-classification study (Chapter 6). :func:`prep_bci2a` downloads and
+  biosignal-classification study. :func:`prep_bci2a` downloads and
   epochs it via MOABB/MNE and writes a shippable ``.npz`` so the heavy EEG
   dependency tree never has to enter the training container.
 
@@ -92,7 +92,7 @@ def mnist_loaders(data_dir=None, seed=0, batch_size=64, train_subset=None,
 
 
 # --------------------------------------------------------------------------
-# BCI Competition IV-2a (biosignal classification, Chapter 6)
+# BCI Competition IV-2a (biosignal classification)
 # --------------------------------------------------------------------------
 # Standard 4-class motor-imagery preprocessing (see prep_bci2a docstring).
 FMIN, FMAX = 8.0, 30.0          # mu + beta motor-imagery band

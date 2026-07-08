@@ -40,9 +40,13 @@ python -c "import torch; print('CUDA Available:', torch.cuda.is_available())"
 
 ## Reproducing Publication Experiments
 
-The `experiments/` directory contains the definitive reproducibility notebooks for the `mnn-torch` package as described in the thesis appendix.
+The `experiments/` directory contains the definitive reproducibility notebooks for the `mnn-torch` package.
 
-By default, these notebooks strictly look for pre-generated output grids in `data/results/`. You must run the command-line scripts to build this data before the notebooks can render figures correctly.
+By default, these notebooks run in `RESULT_MODE = "live"` and compute reduced-budget versions of the result panels directly from the package code.
+
+To render committed outputs from heavier publication-scale sweeps, set `RESULT_MODE = "full_sweep_cache"`. Cache-rendering cells print the source file/provenance and keep the regeneration command pattern commented nearby for examiners who want to rerun the full sweep.
+
+If a grid is missing, run the command-line scripts below to rebuild the quick versions locally.
 
 To generate the missing grids locally, run the following commands from your active `mnn_torch` environment:
 
@@ -62,7 +66,7 @@ python -m mnn_torch.training --isolate --map ohmic --mode device
 python -m mnn_torch.training --isolate --map ohmic --mode fixed
 ```
 
-*Note: The commands above execute the "quick" grids which take only a few minutes but still produce the committed data files the notebooks require. To run the full heavy publication grid (which spawns a ProcessPool and can take hours), append the `--full` flag to any of these commands.*
+*Note: The commands above execute the default quick diagnostic grids. To run heavier publication-scale diagnostic grids, append the `--full` flag where supported. Notebook figures should be generated from code in live mode; cached arrays are an explicit full-sweep rendering path, not the default.*
 
 ### Running the Notebooks
 

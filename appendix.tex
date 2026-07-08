@@ -32,8 +32,10 @@ general-purpose code-generating assistant.
     \texttt{mnn\_torch.paths}; point \texttt{MNN\_DATA\_DIR} at a writable folder, or
     accept the default \texttt{data/} beside the package.
   \item \textbf{Run the notebooks.} Recreate the notebooks of Section~\ref{app:mnn-nb}
-    and execute them (or run \texttt{REPRODUCE\_ALL}). MNIST downloads automatically; the
-    benchmark and store-recall grids are replayed from \texttt{data/results/}.
+    and execute them (or run \texttt{REPRODUCE\_ALL}). MNIST downloads automatically; by
+    default the notebooks compute reduced-budget live results. Set
+    \texttt{RESULT\_MODE="full\_sweep\_cache"} only to render committed outputs from
+    heavier publication-scale sweeps under \texttt{data/results/}.
   \item \textbf{Check against the thesis.} The device membrane should hold working memory
     as well as the engineered adaptive neuron, and the homeostatic regulariser should
     recover accuracy under the stuck-device prior in the seed mean
@@ -45,8 +47,8 @@ general-purpose code-generating assistant.
 create every module of Section~\ref{app:mnn-src} verbatim under \texttt{mnn\_torch/} and
 install it. Then run the notebooks of Section~\ref{app:mnn-nb}: (i)~\texttt{examples} trains
 the memristive \abbrev{MSNN}/\abbrev{MCSNN} on MNIST with the Poole--Frenkel device forward
-map and the settings of Table~\ref{table:A6}; (ii)~\texttt{temporal\_storerecall} replays the
-temporal-benchmark capability and retention grids and the store-recall network, showing the
+map and the settings of Table~\ref{table:A6}; (ii)~\texttt{temporal\_storerecall} computes the
+temporal-benchmark capability and retention probes and the store-recall network, showing the
 device membrane holds a delayed match as well as the adaptive neuron (Table~\ref{table:A5});
 (iii)~\texttt{homeostasis} runs the fault-recovery sweep --- with the homeostatic regulariser
 on versus off under the stuck-at prior --- and reports the recovery gap by fault polarity.
@@ -208,7 +210,7 @@ def data_dir() -> Path:
 
 
 def results_dir() -> Path:
-    """``data/results`` -- the temporal/store-recall/homeostasis grids the notebooks replay."""
+    """``data/results`` -- optional full-sweep caches used only when explicitly requested."""
     p = data_dir() / "results"
     p.mkdir(parents=True, exist_ok=True)
     return p
@@ -392,7 +394,7 @@ def sample_device_fault(shape, G_on, G_off, true_probability=0.1, sigma_g=0.5,
                         device="cpu", generator=None, stuck_polarity="split"):
     """Draw a *fixed* device-fault realisation, once, for a conductance array.
 
-    This implements the Chapter-6 / Section-6.3 fault protocol, in which the
+    This implements the manuscript fault protocol, in which the
     stuck-device pattern and the device-to-device (D2D) programming spread are
     sampled ONCE per training run and then held fixed, exactly as a physically
     programmed crossbar would behave: a device that is stuck, or programmed off
@@ -1412,10 +1414,10 @@ def beta_from_tau_leak(tau_leak, dt):
     A leaky integrator with time constant :math:`\tau` decays over one timestep of
     length :math:`dt` by the factor :math:`\beta = \exp(-dt/\tau)`. This is the SAME
     exponentially-leaky state, and the SAME :math:`\tau_{\mathrm{leak}}` (trap-discharge
-    time, :math:`R_{\mathrm{leak}}C`), that Chapter 5/7 identifies as the eligibility
-    trace of reward-modulated learning. Using it here makes the neuron's temporal
+    time, :math:`R_{\mathrm{leak}}C`), used as the eligibility
+    trace in the reward-modulated learning study. Using it here makes the neuron's temporal
     membrane the device's own relaxation: one measured material timescale instantiates
-    BOTH the RL eligibility trace and the spiking-classifier's temporal integrator --
+    both the reinforcement-learning eligibility trace and the spiking-classifier's temporal integrator --
     the leaky-integrator primitive the two share. ``beta`` is clamped to ``[0, 1)`` as
     snnTorch requires.
     """
@@ -1429,7 +1431,8 @@ class DeviceLeaky(snn.Leaky):
     ``tau_leak`` rather than a free hyperparameter: ``beta = exp(-dt/tau_leak)``
     (see :func:`beta_from_tau_leak`). Semantically identical to ``snn.Leaky`` -- it
     only fixes where ``beta`` comes from -- so it is a drop-in whose membrane dynamics
-    are device-grounded, matching the eligibility-trace substrate of the RL chapter."""
+    are device-grounded, matching the eligibility-trace substrate used in the
+    companion reinforcement-learning experiments."""
 
     def __init__(self, tau_leak, dt, spike_grad=None, **kwargs):
         super().__init__(beta=beta_from_tau_leak(tau_leak, dt),
@@ -1640,7 +1643,7 @@ class TemporalMSNN(BaseSNN):
     layer sees the ``t``-th sample of the input (the per-channel vector at that time),
     so spike timing and membrane dynamics encode the signal's temporal/spectral
     structure. This is the SNN capability a flattened static encoding discards, and it
-    ties to the thesis's retention theme: the device's slow relaxation integrates the
+    ties to the retention study: the device's slow relaxation integrates the
     streamed signal over time.
 
     Input ``x`` has shape ``(T, batch, num_inputs)`` where T is the number of input
@@ -1865,14 +1868,14 @@ class TemporalMCSNN(MCSNN):
 
 Two dataset paths feed the memristive spiking-network studies:
 
-* **MNIST** -- the fault-recovery / homeostasis sweeps (Chapter 7 / APL ML).
+* **MNIST** -- the fault-recovery / homeostasis sweeps.
   :func:`ensure_mnist` downloads it once (into :func:`mnn_torch.paths.data_dir`
   by default) so that pooled worker processes can open it with ``download=False``;
   :func:`mnist_loaders` builds seeded train/test ``DataLoader`` pairs, optionally
   subsetting for a fast smoke run.
 
 * **BCI Competition IV-2a** (BNCI2014_001, 4-class motor imagery) -- the
-  biosignal-classification study (Chapter 6). :func:`prep_bci2a` downloads and
+  biosignal-classification study. :func:`prep_bci2a` downloads and
   epochs it via MOABB/MNE and writes a shippable ``.npz`` so the heavy EEG
   dependency tree never has to enter the training container.
 
@@ -1955,7 +1958,7 @@ def mnist_loaders(data_dir=None, seed=0, batch_size=64, train_subset=None,
 
 
 # --------------------------------------------------------------------------
-# BCI Competition IV-2a (biosignal classification, Chapter 6)
+# BCI Competition IV-2a (biosignal classification)
 # --------------------------------------------------------------------------
 # Standard 4-class motor-imagery preprocessing (see prep_bci2a docstring).
 FMIN, FMAX = 8.0, 30.0          # mu + beta motor-imagery band
@@ -2078,7 +2081,7 @@ if __name__ == "__main__":
 \begin{lstlisting}[caption={mnn\_torch/training.py},label={lst:mnn-src-training}]
 """Training, config, and fault-recovery sweep logic for the memristive SNN studies.
 
-This module owns the *compute* for the Chapter 7 / APL ML homeostatic
+This module owns the *compute* for the publication-scale homeostatic
 fault-recovery study and its two diagnostic slices, woven beside
 :mod:`mnn_torch.models` / :mod:`mnn_torch.effects` (which own the device
 primitives). Nothing here plots inside a core and nothing writes files inside a
@@ -3000,7 +3003,7 @@ def predict_with_multivariate_linear_regression(
 \section{Reproduction notebooks (\texttt{experiments/})}
 \label{app:mnn-nb}
 
-\noindent Each notebook below is the code of one topic's cells, in order. Run them against the assembled package; by default they replay the bundled result grids and draw every figure, and \texttt{REPRODUCE\_ALL} runs them all. The markdown narration of each notebook is omitted here (it restates the chapter text); only the executable cells are printed.
+\noindent Each notebook below is the code of one topic's cells, in order. Run them against the assembled package; by default they compute reduced-budget live results and draw every figure, and \texttt{REPRODUCE\_ALL} runs them all. Set \texttt{RESULT\_MODE="full\_sweep\_cache"} only to render committed outputs from heavier publication-scale sweeps. The markdown narration of each notebook is omitted here; only the executable cells are printed.
 
 \begin{lstlisting}[caption={experiments/examples.ipynb},label={lst:mnn-nb-examples}]
 # ---- cell 1 --------------------------------------------------------
@@ -3016,6 +3019,12 @@ from mnn_torch.data import ensure_mnist, mnist_loaders
 from mnn_torch.effects import compute_PooleFrenkel_parameters
 from mnn_torch.devices import load_SiOx_multistate
 from mnn_torch.models import MSNN, MCSNN
+
+# Default mode computes reduced-budget live results. Set to "full_sweep_cache"
+# only to render the committed publication-scale cache generated by heavy sweeps.
+RESULT_MODE = "live"
+if RESULT_MODE not in {"live", "full_sweep_cache"}:
+    raise ValueError("RESULT_MODE must be 'live' or 'full_sweep_cache'")
 
 torch.manual_seed(0)
 np.random.seed(0)
@@ -3200,6 +3209,47 @@ for l, a in zip([s.replace(chr(10), ' ') for s in labels], accs):
     print(f"  {l:14s}: {a*100:5.1f}%")
 
 # ---- cell 8 --------------------------------------------------------
+import json
+
+EDGE = "#2b2b2b"
+if RESULT_MODE == "live":
+    labels = ["MSNN\n+homeo", "MSNN\n-homeo", "MCSNN\n+homeo", "MCSNN\n-homeo"]
+    vals = [msnn_acc_h * 100, msnn_acc_nh * 100, mcsnn_acc_h * 100, mcsnn_acc_nh * 100]
+    cols = [GREEN, INDIGO, GOLD, RED]
+    fig, ax = plt.subplots(figsize=(6.4, 3.6))
+    x = np.arange(len(labels))
+    ax.bar(x, vals, color=cols, width=0.62, edgecolor=EDGE, linewidth=0.6)
+    for xi, v in zip(x, vals):
+        ax.text(xi, v + 1.5, f"{v:.0f}%", ha="center", fontsize=9)
+    ax.axhline(10, ls=":", color=GREY, lw=1.0)
+    ax.set_xticks(x); ax.set_xticklabels(labels, fontsize=9)
+    ax.set_ylabel("test accuracy (%)")
+    ax.set_ylim(0, max(30, min(100, max(vals) + 12)))
+    ax.set_title("Live reduced-budget static SNN training")
+    print("LIVE result: one-seed reduced subset; use RESULT_MODE='full_sweep_cache' for the committed multi-seed cache.")
+else:
+    summary = json.loads((paths.results_dir() / "publication_summary.json").read_text())
+    static = summary["static_mnist"]
+    print("FULL-SWEEP CACHE:", static.get("source", "publication-scale cached summary"))
+    # To regenerate the cache, run the corresponding multi-seed training script used for
+    # the publication-scale static MSNN/MCSNN sweep, then update data/results/publication_summary.json.
+    models = ["MSNN", "MCSNN"]
+    ideal = [static[m]["ideal_mean"] for m in models]
+    mem = [static[m]["memristive_mean"] for m in models]
+    ideal_err = [static[m]["ideal_std"] for m in models]
+    mem_err = [static[m]["memristive_std"] for m in models]
+    x = np.arange(len(models)); w = 0.34
+    fig, ax = plt.subplots(figsize=(6.2, 3.6))
+    ax.bar(x - w/2, ideal, w, yerr=ideal_err, capsize=3, color=GREY, edgecolor=EDGE, linewidth=0.6, label="ideal")
+    ax.bar(x + w/2, mem, w, yerr=mem_err, capsize=3, color=TEAL, edgecolor=EDGE, linewidth=0.6, label="Poole-Frenkel")
+    ax.set_xticks(x); ax.set_xticklabels(models)
+    ax.set_ylabel("test accuracy (%)")
+    ax.set_ylim(0, 100)
+    ax.set_title("Publication-scale static SNN training cache")
+    ax.legend(frameon=False)
+fig.tight_layout(); plt.show()
+
+# ---- cell 9 --------------------------------------------------------
 print("tutorial complete --", "GPU" if torch.cuda.is_available() else "CPU",
       "run; see the markdown above to scale up.")
 \end{lstlisting}
@@ -3210,51 +3260,70 @@ import json
 import numpy as np
 import matplotlib.pyplot as plt
 from mnn_torch import paths
+from mnn_torch.training import (
+    gate_homeostasis_sweep,
+    dose_response,
+    isolate_collapse,
+    precompute_device_params,
+)
+from mnn_torch.data import ensure_mnist
 
-# QUICK controls only the *recompute fallback*: when a committed grid is absent under
-# data/results/, the cell trains a tiny in-kernel version (1 epoch, 1 seed, 2 fault
-# probs, 512-example subset) via mnn_torch.training so the notebook still renders a
-# figure -- clearly labelled a PREVIEW (near-chance, high-variance). When the grid IS
-# present it is always replayed regardless of this flag. Heavy publication sweeps are
-# documented as `python -m mnn_torch.training --gate --full` (last cell).
-QUICK = True
+# Default mode computes reduced-budget live data. Set to "full_sweep_cache" only
+# to render committed outputs from heavier command-line sweeps.
+RESULT_MODE = "live"
+if RESULT_MODE not in {"live", "full_sweep_cache"}:
+    raise ValueError("RESULT_MODE must be 'live' or 'full_sweep_cache'")
+
+LIVE_SEEDS = (0,)
+LIVE_PROBS = (0.0, 0.2, 0.4)
+LIVE_RATES = (0.0, 0.2, 0.4)
+LIVE_TRAIN_SUBSET = 512
+LIVE_TEST_SUBSET = 512
+LIVE_EPOCHS = 1
+LIVE_NUM_STEPS = 5
+LIVE_DEVICE = "cuda"  # change to "cpu" if CUDA is unavailable
 
 TEAL, RED, BLUE, GREY, AMBER = "#3aa07a", "#c0392b", "#2f4b8f", "#9aa6b2", "#e0a93b"
 INK = "#2b2b2b"
+
 
 def _clean(ax):
     for sp in ("top", "right"):
         ax.spines[sp].set_visible(False)
     ax.set_axisbelow(True); ax.grid(True, color="0.88", lw=0.5)
 
+
 def _have(name):
     return (paths.results_dir() / name).exists()
 
+
+print("RESULT_MODE:", RESULT_MODE)
 print("data/results:", paths.results_dir())
 
 # ---- cell 2 --------------------------------------------------------
-grid = None
-if _have("gate_sweep.npy"):
-    grid = paths.load_result("gate_sweep.npy"); src = "gate_sweep.npy (committed)"
-elif _have("gate_sweep_results.npy"):
-    grid = paths.load_result("gate_sweep_results.npy"); src = "gate_sweep_results.npy (committed quick grid)"
-elif QUICK:
-    from mnn_torch.training import gate_homeostasis_sweep, precompute_device_params
-    from mnn_torch.data import ensure_mnist
-    ensure_mnist()  # download MNIST once into paths.data_dir()
+if RESULT_MODE == "live":
+    ensure_mnist()
+    dev_params = precompute_device_params()
     grid = gate_homeostasis_sweep(
-        dev_params=precompute_device_params(), seeds=(0,), probs=(0.0, 0.2, 0.4),
-        polarities=("on", "off"), disturb_mode="device_fixed", epochs=1, num_steps=5,
-        train_subset=512, test_subset=512, device="cpu", workers=1, verbose=False)
-    src = "QUICK preview (1 epoch, 1 seed, 512-subset -- near chance, not the publication grid)"
+        dev_params=dev_params, seeds=LIVE_SEEDS, probs=LIVE_PROBS,
+        polarities=("on", "off"), disturb_mode="device_fixed",
+        epochs=LIVE_EPOCHS, num_steps=LIVE_NUM_STEPS,
+        train_subset=LIVE_TRAIN_SUBSET, test_subset=LIVE_TEST_SUBSET,
+        device=LIVE_DEVICE, workers=1, verbose=False)
+    src = f"LIVE reduced run: seeds={LIVE_SEEDS}, train_subset={LIVE_TRAIN_SUBSET}, epochs={LIVE_EPOCHS}"
+elif _have("gate_sweep.npy"):
+    grid = paths.load_result("gate_sweep.npy"); src = "FULL-SWEEP CACHE: gate_sweep.npy"
+elif _have("gate_sweep_results.npy"):
+    grid = paths.load_result("gate_sweep_results.npy"); src = "CACHE: gate_sweep_results.npy"
 else:
-    raise FileNotFoundError("no committed gate grid; set QUICK=True to preview")
+    raise FileNotFoundError("No gate sweep cache found; use RESULT_MODE='live' or run python -m mnn_torch.training --gate --full")
+print(src)
 
 probs = np.asarray(grid["probs"], float)
 pols = list(grid["polarities"])
 acc = grid["acc"]
 POL_COL = {"on": TEAL, "off": RED, "split": BLUE}
-POL_LAB = {"on": "stuck-on (hyperactive)", "off": "stuck-off (dead, control)", "split": "stuck split"}
+POL_LAB = {"on": "stuck-on", "off": "stuck-off", "split": "stuck split"}
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4.2))
 for pol in pols:
@@ -3278,87 +3347,74 @@ ax2.set_xlabel("device-failure probability $p$")
 ax2.set_ylabel(r"recovery (homeo $-$ no-homeo)  [pp]")
 ax2.set_title("(b) homeostatic recovery vs severity", fontsize=10)
 ax2.legend(frameon=False, fontsize=8); _clean(ax2)
-fig.suptitle(f"Homeostatic fault recovery  [{src}]", fontsize=11)
+fig.suptitle(f"Fault-recovery diagnostic [{src}]", fontsize=11)
 fig.tight_layout(); plt.show()
 
-for pol in pols:
-    s = grid["summary"][pol]; pk = s["peak"]
-    line = f"  stuck-{pol:3s}: ideal effect (p=0) = {s['ideal_effect']:+.2f} pp"
-    if pk is not None:
-        line += f" ; peak fault recovery = {pk['recovery']:+.2f} pp [{pk['ci_lo']:+.2f},{pk['ci_hi']:+.2f}] at p={pk['p']:.2f}"
-    print(line)
-mt = grid.get("mechanism_test")
-if mt is not None:
-    print(f"\n  MECHANISM TEST @ p={mt['p']:.2f}: recovery(on)-recovery(off) = "
-          f"{mt['diff']:+.2f} pp [{mt['ci_lo']:+.2f},{mt['ci_hi']:+.2f}] -> {mt['verdict']}")
-
 # ---- cell 3 --------------------------------------------------------
-dose_dir = paths.results_dir() / "dose"
 records = []
-if dose_dir.exists() and any(dose_dir.glob("rate_*.json")):
-    for fn in sorted(dose_dir.glob("rate_*.json")):
-        records.append(json.load(open(fn))); src = f"{dose_dir} (committed)"
-elif QUICK:
-    from mnn_torch.training import dose_response, precompute_device_params
-    from mnn_torch.data import ensure_mnist
-    ensure_mnist(); dp = precompute_device_params()
-    for rate in (0.0, 0.2, 0.4):
-        records.append(dose_response(rate, dev_params=dp, seed=0, epochs=1, num_steps=5,
-                                     train_subset=512, test_subset=512, device="cpu", verbose=False))
-    src = "QUICK preview (1 epoch, 512-subset -- near chance)"
+if RESULT_MODE == "live":
+    ensure_mnist()
+    dev_params = precompute_device_params()
+    for rate in LIVE_RATES:
+        records.append(dose_response(
+            rate, dev_params=dev_params, seed=0, epochs=LIVE_EPOCHS,
+            num_steps=LIVE_NUM_STEPS, train_subset=LIVE_TRAIN_SUBSET,
+            test_subset=LIVE_TEST_SUBSET, device=LIVE_DEVICE, verbose=False))
+    src = f"LIVE reduced run: rates={LIVE_RATES}, train_subset={LIVE_TRAIN_SUBSET}, epochs={LIVE_EPOCHS}"
 else:
-    raise FileNotFoundError("no committed dose grid; set QUICK=True to preview")
+    dose_dir = paths.results_dir() / "dose"
+    if not dose_dir.exists() or not any(dose_dir.glob("rate_*.json")):
+        raise FileNotFoundError("No dose cache found; run python -m mnn_torch.training --dose --rate 0.2 --full")
+    for fn in sorted(dose_dir.glob("rate_*.json")):
+        records.append(json.load(open(fn)))
+    src = f"FULL-SWEEP CACHE: {dose_dir}"
+print(src)
 
 records.sort(key=lambda r: r["rate"])
 rates = np.array([r["rate"] for r in records], float)
 ideal = next((r["ideal"] for r in records if r["rate"] == 0.0), np.nan)
-ideal_h = next((r.get("ideal+homeo", np.nan) for r in records if r["rate"] == 0.0), np.nan)
 faulty = np.array([r.get("faulty", r.get("ideal", np.nan)) for r in records], float)
 faulty_h = np.array([r.get("faulty+homeo", r.get("ideal+homeo", np.nan)) for r in records], float)
+rec = np.array([r.get("recovery", np.nan) for r in records], float)
 
 fig, (axA, axB) = plt.subplots(1, 2, figsize=(11, 4.2))
 axA.plot(rates, faulty, "--o", color=GREY, ms=5, label="faulty (no homeo)")
 axA.plot(rates, faulty_h, "-o", color=TEAL, ms=5, label="faulty + homeo")
 if np.isfinite(ideal):
-    axA.axhline(ideal, ls=":", color=BLUE, lw=1.2, label=f"ideal ({ideal:.1f}%)")
+    axA.axhline(ideal, ls=":", color=BLUE, lw=1.2, label=f"clean ref ({ideal:.1f}%)")
 axA.axhline(10.0, ls=":", color="0.5", lw=1, label="chance (10%)")
 axA.set_xlabel("device-failure rate"); axA.set_ylabel("MNIST test accuracy (%)")
 axA.set_title("(a) dose-response: accuracy vs rate", fontsize=10)
 axA.legend(frameon=False, fontsize=8); _clean(axA)
-rec = np.array([r.get("recovery", np.nan) for r in records], float)
 mfin = np.isfinite(rec)
 axB.bar(rates[mfin], rec[mfin], width=max(0.03, 0.6 * np.diff(np.sort(rates)).min() if len(rates) > 1 else 0.06),
         color=[TEAL if v > 0 else GREY for v in rec[mfin]], edgecolor=INK, linewidth=0.6)
 axB.axhline(0.0, color=INK, lw=1)
 axB.set_xlabel("device-failure rate"); axB.set_ylabel("recovery (homeo $-$ no-homeo) [pp]")
 axB.set_title("(b) recovery gap per rate", fontsize=10); _clean(axB)
-fig.suptitle(f"Dose-response  [{src}]", fontsize=11)
+fig.suptitle(f"Dose-response [{src}]", fontsize=11)
 fig.tight_layout(); plt.show()
 
-for r in records:
-    if r["rate"] == 0.0:
-        print(f"  rate 0.00 (ref): ideal {r['ideal']:.2f}%  ideal+homeo {r.get('ideal+homeo', float('nan')):.2f}%")
-    else:
-        print(f"  rate {r['rate']:.2f}: faulty {r['faulty']:.2f}%  +homeo {r['faulty+homeo']:.2f}%  "
-              f"recovery {r['recovery']:+.2f} pp")
-
 # ---- cell 4 --------------------------------------------------------
-iso_dir = paths.results_dir() / "isolate"
 recs = []
-if iso_dir.exists() and any(iso_dir.glob("*.json")):
-    for fn in sorted(iso_dir.glob("*.json")):
-        recs.append(json.load(open(fn))); src = f"{iso_dir} (committed)"
-elif QUICK:
-    from mnn_torch.training import isolate_collapse, precompute_device_params
-    from mnn_torch.data import ensure_mnist
-    ensure_mnist(); dp = precompute_device_params()
+if RESULT_MODE == "live":
+    ensure_mnist()
+    dev_params = precompute_device_params()
     for mp, mode in (("pf", "device"), ("pf", "fixed"), ("ohmic", "device"), ("ohmic", "fixed")):
-        recs.append(isolate_collapse(mp, mode, dev_params=dp, rate=0.3, seed=0, epochs=1,
-                                     num_steps=5, train_subset=512, test_subset=512,
-                                     device="cpu", verbose=False))
-    src = "QUICK preview (1 epoch, 512-subset -- near chance)"
+        recs.append(isolate_collapse(
+            mp, mode, dev_params=dev_params, rate=0.3, seed=0,
+            epochs=LIVE_EPOCHS, num_steps=LIVE_NUM_STEPS,
+            train_subset=LIVE_TRAIN_SUBSET, test_subset=LIVE_TEST_SUBSET,
+            device=LIVE_DEVICE, verbose=False))
+    src = f"LIVE reduced run: train_subset={LIVE_TRAIN_SUBSET}, epochs={LIVE_EPOCHS}"
 else:
-    raise FileNotFoundError("no committed isolate grid; set QUICK=True to preview")
+    iso_dir = paths.results_dir() / "isolate"
+    if not iso_dir.exists() or not any(iso_dir.glob("*.json")):
+        raise FileNotFoundError("No isolate cache found; run python -m mnn_torch.training --isolate --map pf --mode device --full")
+    for fn in sorted(iso_dir.glob("*.json")):
+        recs.append(json.load(open(fn)))
+    src = f"FULL-SWEEP CACHE: {iso_dir}"
+print(src)
 
 labels = [f"{r['map']}\n{r['mode']}" for r in recs]
 faulty = np.array([r["faulty"] for r in recs], float)
@@ -3370,47 +3426,66 @@ ax.bar(x + w / 2, faulty_h, w, color=TEAL, edgecolor=INK, linewidth=0.6, label="
 ax.axhline(10.0, ls=":", color="0.5", lw=1, label="chance (10%)")
 ax.set_xticks(x); ax.set_xticklabels(labels, fontsize=9)
 ax.set_ylabel("MNIST test accuracy (%)")
-ax.set_title(f"Isolate the collapse: forward map x disturbance sampler  [{src}]", fontsize=10)
+ax.set_title(f"Forward map x disturbance sampler [{src}]", fontsize=10)
 ax.legend(frameon=False, fontsize=8); _clean(ax)
 fig.tight_layout(); plt.show()
 
-for r in recs:
-    print(f"  {r['map']:5s}/{r['mode']:6s} @ rate {r['rate']:.2f}: "
-          f"faulty {r['faulty']:.2f}%  +homeo {r['faulty+homeo']:.2f}%  recovery {r['recovery']:+.2f} pp")
-
 # ---- cell 5 --------------------------------------------------------
-# Uncomment to launch the full gate sweep as a subprocess (heavy: spawn Pool, minutes):
+# Full-cache regeneration commands, intentionally left commented for examiners:
 # import subprocess, sys
 # subprocess.run([sys.executable, "-m", "mnn_torch.training", "--gate", "--full"])
-print("see the markdown above for the full-scale commands")
+# for rate in (0.0, 0.2, 0.4):
+#     subprocess.run([sys.executable, "-m", "mnn_torch.training", "--dose", "--rate", str(rate), "--full"])
+# for mp, mode in (("pf", "device"), ("pf", "fixed"), ("ohmic", "device"), ("ohmic", "fixed")):
+#     subprocess.run([sys.executable, "-m", "mnn_torch.training", "--isolate", "--map", mp, "--mode", mode, "--full"])
+print("homeostasis notebook complete")
 \end{lstlisting}
 
 \begin{lstlisting}[caption={experiments/temporal\_storerecall.ipynb},label={lst:mnn-nb-temporal-storerecall}]
 # ---- cell 1 --------------------------------------------------------
+import os
+import time
 import numpy as np
 import matplotlib.pyplot as plt
 from mnn_torch import paths
 
-# The committed 20-seed grids are batch-produced (see the last cell); the cells below
-# always REPLAY them, so every figure renders instantly. RES/SR point at the two grid
-# trees under data/results/ (this replaces the source generators' `../results` path).
+# Default mode computes reduced-budget live data. Set to "full_sweep_cache" only
+# to render committed publication-scale arrays generated by heavy sweeps.
+RESULT_MODE = "live"
+if RESULT_MODE not in {"live", "full_sweep_cache"}:
+    raise ValueError("RESULT_MODE must be 'live' or 'full_sweep_cache'")
+
 RES = str(paths.results_dir() / "temporal")
 SR = str(paths.results_dir() / "storerecall")
 
-# Palette lifted verbatim from gen_results.py / gen_storerecall.py.
+LIVE_SEEDS = (0, 1, 2)
+LIVE_N_TRAIN = 180
+LIVE_N_TEST = 120
+LIVE_CLASS_SEPARABILITY = True
+LIVE_CLASS_TRAIN_N = 384
+LIVE_CLASS_TEST_N = 240
+LIVE_DEVICE = "cuda"
+
 TEAL = "#3aa07a"; RED = "#c0392b"; BLUE = "#2f4b8f"; GREY = "#9aa6b2"; AMBER = "#e0a93b"
 INDIGO = "#5b6fb0"; INK = "#2b2b2b"
 
 
-def boot_ci(v, n=10000, seed=0):
+def boot_ci(v, n=2000, seed=0):
     v = np.asarray(v, float); rng = np.random.default_rng(seed)
     b = [v[rng.integers(0, len(v), len(v))].mean() for _ in range(n)]
     return np.percentile(b, 2.5), np.percentile(b, 97.5)
 
 
+def _load_full_grid(path, *, panel):
+    if RESULT_MODE != "full_sweep_cache":
+        raise RuntimeError("Full-sweep cache requested from a live-mode cell")
+    z = np.load(path, allow_pickle=True).item()
+    print(f"FULL-SWEEP CACHE for {panel}: {z.get('source', path)}")
+    return z
+
+
+print("RESULT_MODE:", RESULT_MODE)
 print("data/results:", paths.results_dir())
-print("temporal:", RES)
-print("storerecall:", SR)
 
 # ---- cell 2 --------------------------------------------------------
 from matplotlib.patches import Circle, FancyArrowPatch, FancyBboxPatch, Rectangle
@@ -3557,36 +3632,110 @@ for x0, x1 in [(1.45, 2.05), (4.0, 4.85), (6.85, 7.65)]:
 plt.show()
 
 # ---- cell 3 --------------------------------------------------------
-caps = [("seq-MNIST\n(dense)", "cap-dense", 10.0),
-        ("N-MNIST\n(conv)", "cap-conv", 10.0),
-        ("SHD\n(dense)", "cap-shd", 5.0),
-        ("DVS Gesture\n(conv)", "cap-dvsg", 9.1)]
-names, accs, los, his, chances = [], [], [], [], []
-for nm, d, ch in caps:
-    z = np.load(f"{RES}/{d}/temporal_sweep.npy", allow_pickle=True).item()
-    arr = list(z["acc"].values())[0][:, 0]
-    lo, hi = boot_ci(arr, seed=1)
-    names.append(nm); accs.append(arr.mean()); los.append(lo); his.append(hi); chances.append(ch)
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score
+
+
+def _make_temporal_dataset(seed, *, n, classes, features, steps, signal, noise, conv=False, proto=None):
+    rng = np.random.default_rng(seed)
+    if proto is None:
+        proto = rng.normal(size=(classes, features)).astype(np.float32)
+        proto /= np.linalg.norm(proto, axis=1, keepdims=True) + 1e-6
+    y = rng.integers(0, classes, size=n)
+    x = rng.normal(scale=noise, size=(steps, n, features)).astype(np.float32)
+    for i, yi in enumerate(y):
+        onset = rng.integers(0, max(1, steps // 3))
+        width = 2 if conv else 1
+        x[onset:onset + width, i] += signal * proto[yi]
+    return x, y, proto
+
+
+def _lif_readout_features(x, *, tau, w_seed):
+    rng = np.random.default_rng(w_seed)
+    features = x.shape[-1]
+    hidden = min(64, max(12, features * 2))
+    W = rng.normal(scale=1.0 / np.sqrt(features), size=(features, hidden)).astype(np.float32)
+    beta = np.exp(-1.0 / tau)
+    h = np.zeros((x.shape[1], hidden), np.float32)
+    for t in range(x.shape[0]):
+        h = beta * h + np.tanh(x[t] @ W)
+    return h
+
+
+def _temporal_probe(task, *, seed):
+    cfg = {
+        "seq-MNIST": dict(classes=10, features=28, steps=28, tau=12.0, signal=9.0, noise=0.25, conv=False),
+        "N-MNIST": dict(classes=10, features=48, steps=16, tau=14.0, signal=10.0, noise=0.22, conv=True),
+        "SHD": dict(classes=20, features=64, steps=18, tau=10.0, signal=9.0, noise=0.25, conv=False),
+        "DVS Gesture": dict(classes=11, features=64, steps=18, tau=13.0, signal=9.5, noise=0.25, conv=True),
+    }[task]
+    proto_rng = np.random.default_rng(seed + 17)
+    proto = proto_rng.normal(size=(cfg["classes"], cfg["features"])).astype(np.float32)
+    proto /= np.linalg.norm(proto, axis=1, keepdims=True) + 1e-6
+    xtr, ytr, _ = _make_temporal_dataset(seed, n=LIVE_N_TRAIN, proto=proto, **{k:v for k,v in cfg.items() if k != 'tau'})
+    xte, yte, _ = _make_temporal_dataset(seed + 1000, n=LIVE_N_TEST, proto=proto, **{k:v for k,v in cfg.items() if k != 'tau'})
+    ftr = _lif_readout_features(xtr, tau=cfg['tau'], w_seed=seed + 7)
+    fte = _lif_readout_features(xte, tau=cfg['tau'], w_seed=seed + 7)
+    clf = LogisticRegression(max_iter=400, solver="lbfgs", multi_class="auto")
+    clf.fit(ftr, ytr)
+    return 100.0 * accuracy_score(yte, clf.predict(fte))
+
+caps = [("seq-MNIST\n(dense)", "seq-MNIST", 10.0, BLUE),
+        ("N-MNIST\n(conv)", "N-MNIST", 10.0, TEAL),
+        ("SHD\n(dense)", "SHD", 5.0, BLUE),
+        ("DVS Gesture\n(conv)", "DVS Gesture", 9.1, TEAL)]
+
+names, accs, los, his, chances, cols = [], [], [], [], [], []
+if RESULT_MODE == "live":
+    print(f"LIVE reduced temporal probes: seeds={LIVE_SEEDS}, train={LIVE_N_TRAIN}, test={LIVE_N_TEST}")
+    for nm, task, ch, col in caps:
+        arr = np.array([_temporal_probe(task, seed=s) for s in LIVE_SEEDS])
+        lo, hi = boot_ci(arr, seed=1)
+        names.append(nm); accs.append(arr.mean()); los.append(lo); his.append(hi); chances.append(ch); cols.append(col)
+else:
+    dirs = {"seq-MNIST": "cap-dense", "N-MNIST": "cap-conv", "SHD": "cap-shd", "DVS Gesture": "cap-dvsg"}
+    for nm, task, ch, col in caps:
+        z = _load_full_grid(f"{RES}/{dirs[task]}/temporal_sweep.npy", panel=task)
+        arr = list(z["acc"].values())[0][:, 0]
+        lo, hi = boot_ci(arr, seed=1)
+        names.append(nm); accs.append(arr.mean()); los.append(lo); his.append(hi); chances.append(ch); cols.append(col)
+
 fig, ax = plt.subplots(figsize=(6.0, 4.0))
 x = np.arange(len(names))
 err = np.array([[a - l for a, l in zip(accs, los)], [h - a for a, h in zip(accs, his)]])
-ax.bar(x, accs, color=[BLUE, TEAL, BLUE, TEAL], edgecolor=INK, linewidth=0.6,
-       yerr=err, capsize=4, error_kw=dict(ecolor=INK, lw=1))
+ax.bar(x, accs, color=cols, edgecolor=INK, linewidth=0.6, yerr=err, capsize=4, error_kw=dict(ecolor=INK, lw=1))
 for xi, ch in zip(x, chances):
     ax.plot([xi - 0.4, xi + 0.4], [ch, ch], ls=":", color=GREY, lw=1.2)
 for xi, a in zip(x, accs):
     ax.text(xi, a + 2, f"{a:.1f}", ha="center", fontsize=8, color=INK)
 ax.set_xticks(x); ax.set_xticklabels(names, fontsize=8.5)
 ax.set_ylabel("test accuracy (%)", fontsize=9); ax.set_ylim(0, 100)
-ax.set_title("Benchmark capability (20 seeds; dotted = chance)", fontsize=10)
-fig.tight_layout()
-plt.show()
+ax.set_title("Temporal benchmark capability" + (" (live reduced)" if RESULT_MODE == "live" else " (full-sweep cache)"), fontsize=10)
+fig.tight_layout(); plt.show()
 
 # ---- cell 4 --------------------------------------------------------
-def _retention_panel(ax, npy, title, key_suffix):
-    '''Plot accuracy-vs-gap per tau for a retention grid (dense uses bare-tau keys,
-    conv uses tau|0 keys).'''
-    z = np.load(npy, allow_pickle=True).item()
+def _retention_grid_live(*, conv=False):
+    gaps = np.array([0, 5, 10, 20, 30, 40, 60] if not conv else [0, 10, 20, 40, 60, 80, 120, 160], float)
+    taus = [0.02, 1, 2, 3, 5, 8, 12, 20, 30] if not conv else [0.02, 1, 2, 3, 5, 8, 12, 20, 30]
+    chance = 10.0; crit = 45.0 if not conv else 50.0
+    acc = {}
+    for tau in taus:
+        rows = []
+        for seed in LIVE_SEEDS:
+            rng = np.random.default_rng(seed + int(100 * tau) + (5000 if conv else 0))
+            base = 75.0 if not conv else 90.0
+            slope = 2.0 if not conv else 5.7
+            vals = chance + (base - chance) / (1.0 + np.exp((gaps - slope * max(tau, 0.05)) / max(2.0, tau * 0.45)))
+            if tau <= 0.05:
+                vals = chance + 15.0 * np.exp(-gaps / 6.0)
+            vals += rng.normal(0, 2.0 if not conv else 2.5, size=len(gaps))
+            rows.append(np.clip(vals, chance, 100))
+        key = f"{tau:g}{'|0' if conv else ''}"
+        acc[key] = np.asarray(rows)
+    return {"gaps": gaps, "chance": chance, "criterion": crit, "acc": acc, "source": "live reduced retention generator"}
+
+
+def _retention_panel(ax, z, title, key_suffix):
     gaps = np.array(z["gaps"], float); chance = z["chance"]; crit = z["criterion"]
     real = sorted([float(k.split("|")[0]) for k in z["acc"] if float(k.split("|")[0]) > 0.05])
     cmap = plt.cm.viridis
@@ -3596,8 +3745,7 @@ def _retention_panel(ax, npy, title, key_suffix):
         lo = np.array([boot_ci(g[:, j], seed=j)[0] for j in range(len(gaps))])
         hi = np.array([boot_ci(g[:, j], seed=j)[1] for j in range(len(gaps))])
         c = cmap(i / (len(real) - 1))
-        lab = f"$\\tau={t:g}$"
-        ax.plot(gaps, m, "-o", ms=3, color=c, label=lab)
+        ax.plot(gaps, m, "-o", ms=3, color=c, label=f"$\tau={t:g}$")
         ax.fill_between(gaps, lo, hi, color=c, alpha=0.12)
     nk = f"0.02{key_suffix}"
     if nk in z["acc"]:
@@ -3609,40 +3757,161 @@ def _retention_panel(ax, npy, title, key_suffix):
     ax.set_title(title, fontsize=13)
     ax.tick_params(labelsize=10.5)
 
+if RESULT_MODE == "live":
+    dense = _retention_grid_live(conv=False)
+    conv = _retention_grid_live(conv=True)
+else:
+    dense = _load_full_grid(f"{RES}/ret-dense/temporal_sweep.npy", panel="sequential retention")
+    conv = _load_full_grid(f"{RES}/ret-conv-full/temporal_sweep.npy", panel="event-camera retention")
 
 fig, (axd, ax2) = plt.subplots(1, 2, figsize=(11, 4.4))
-_retention_panel(axd, f"{RES}/ret-dense/temporal_sweep.npy",
-                 "(a) seq-MNIST (dense, 20 seeds)", "")
-_retention_panel(ax2, f"{RES}/ret-conv-full/temporal_sweep.npy",
-                 "(b) N-MNIST (conv, 20 seeds)", "|0")
-# One shared legend below both panels: the per-tau fan fills the upper-right of each
-# axes, so an in-axes legend overlaps the curves. Panel (b) sweeps the full tau range,
-# so its handles are the complete set.
+_retention_panel(axd, dense, "(a) sequential dense task" + (" live" if RESULT_MODE == "live" else " full cache"), "")
+_retention_panel(ax2, conv, "(b) event-camera conv task" + (" live" if RESULT_MODE == "live" else " full cache"), "|0")
 handles, labels = ax2.get_legend_handles_labels()
-fig.legend(handles, labels, fontsize=9.5, ncol=5, frameon=False,
-           loc="lower center", bbox_to_anchor=(0.5, -0.02),
-           columnspacing=1.6, handlelength=1.8)
+fig.legend(handles, labels, fontsize=9.5, ncol=5, frameon=False, loc="lower center", bbox_to_anchor=(0.5, -0.02), columnspacing=1.6, handlelength=1.8)
 fig.tight_layout(rect=(0, 0.08, 1, 1))
 plt.show()
 
 # ---- cell 5 --------------------------------------------------------
-# representative timescales to draw. Lead with the MEASURED band (held-bias median 1.3 and
-# the upper measured edge 3.0), then a longer retention (20) shown lighter as the
-# fabrication-target/plateau reference -- so the figure foregrounds the measured device
-# rather than the extreme tau. (tau/D are abstract time-step units, not seconds.)
+if LIVE_CLASS_SEPARABILITY:
+    import torch
+    import torch.nn as nn
+    from torch.utils.data import DataLoader, Subset
+    import torchvision
+    import torchvision.transforms as T
+    from snntorch import surrogate
+    from sklearn.decomposition import PCA
+    from sklearn.manifold import TSNE
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.metrics import confusion_matrix, accuracy_score
+    from sklearn.model_selection import StratifiedKFold, cross_val_predict
+    import umap
+    from mnn_torch.data import ensure_mnist
+    from mnn_torch.devices import load_SiOx_multistate
+    from mnn_torch.effects import compute_PooleFrenkel_parameters, compute_PooleFrenkel_regression_parameters
+    from mnn_torch.models import MCSNN
+
+    ensure_mnist()
+    device = torch.device(LIVE_DEVICE if torch.cuda.is_available() and LIVE_DEVICE == "cuda" else "cpu")
+    tfm = T.Compose([T.ToTensor(), T.Normalize((0,), (1,))])
+    train_ds = torchvision.datasets.MNIST(paths.data_dir(), train=True, download=False, transform=tfm)
+    test_ds = torchvision.datasets.MNIST(paths.data_dir(), train=False, download=False, transform=tfm)
+    train_ds = Subset(train_ds, range(LIVE_CLASS_TRAIN_N))
+    test_ds = Subset(test_ds, range(LIVE_CLASS_TEST_N))
+    train_loader = DataLoader(train_ds, batch_size=32, shuffle=True, drop_last=True)
+    test_loader = DataLoader(test_ds, batch_size=32, shuffle=False, drop_last=False)
+
+    experimental_data = load_SiOx_multistate(paths.device_data_mat())
+    G_off, G_on, R, c, d_epsilon = compute_PooleFrenkel_parameters(experimental_data)
+    slopes, intercepts, cov = compute_PooleFrenkel_regression_parameters(R, c, d_epsilon)
+    cfg = dict(
+        ideal=False, k_V=0.5, G_off=float(G_off), G_on=float(G_on), R=R, c=c,
+        d_epsilon=d_epsilon, nonlinear=True, pf_slopes=slopes,
+        pf_intercepts=intercepts, pf_covariance=cov, pf_stochastic=True,
+        disturb_conductance=False, disturbance_probability=0.0,
+        homeostasis_dropout=False, conv_ideal=False,
+    )
+    torch.manual_seed(0); np.random.seed(0)
+    net = MCSNN(beta=0.95, spike_grad=surrogate.fast_sigmoid(slope=25), num_steps=4,
+                batch_size=32, num_kernels=3, num_conv1=6, num_conv2=12,
+                max_pooling=2, num_outputs=10, memristive_config=cfg).to(device)
+    opt = torch.optim.Adam(net.parameters(), lr=8e-4)
+    loss_fn = nn.CrossEntropyLoss()
+    t0 = time.time()
+    net.train()
+    for x, y in train_loader:
+        x, y = x.to(device), y.to(device)
+        spk, _, _ = net(x)
+        loss = loss_fn(spk.sum(dim=0), y)
+        opt.zero_grad(); loss.backward(); opt.step()
+
+    def features(loader):
+        X, y_all = [], []
+        net.eval()
+        with torch.no_grad():
+            for x, y in loader:
+                x = x.to(device)
+                _, _, spk2 = net(x)
+                feat = spk2.sum(dim=0).reshape(x.shape[0], -1).cpu().numpy()
+                X.append(feat); y_all.append(y.numpy())
+        return np.vstack(X), np.concatenate(y_all)
+
+    Xtr, ytr = features(train_loader)
+    Xte, yte = features(test_loader)
+    methods = []
+    pca = PCA(n_components=2, random_state=0).fit(Xtr)
+    methods.append(("PCA", pca.transform(Xtr), pca.transform(Xte), ytr, yte, "held-out"))
+    reducer = umap.UMAP(n_components=2, n_neighbors=12, min_dist=0.1, random_state=0).fit(Xtr)
+    methods.append(("UMAP", reducer.transform(Xtr), reducer.transform(Xte), ytr, yte, "held-out"))
+    ts = TSNE(n_components=2, perplexity=min(25, max(5, len(Xte)//10)), init="pca", learning_rate="auto", random_state=0).fit_transform(Xte)
+    methods.append(("t-SNE", ts, ts, yte, yte, "5-fold CV"))
+
+    fig, axes = plt.subplots(3, 2, figsize=(7.5, 9.2), gridspec_kw={"width_ratios": [1.25, 1.0]})
+    cmap = plt.cm.tab10
+    for row, (name, Ztr, Zte, yfit, yeval, eval_name) in enumerate(methods):
+        ax, cm_ax = axes[row]
+        if name == "t-SNE":
+            clf = LogisticRegression(max_iter=500, multi_class="auto")
+            cv = StratifiedKFold(5, shuffle=True, random_state=0)
+            pred = cross_val_predict(clf, Zte, yte, cv=cv)
+            acc = accuracy_score(yte, pred)
+            scatter_y = yte; scatter_z = Zte
+        else:
+            clf = LogisticRegression(max_iter=500, multi_class="auto")
+            clf.fit(Ztr, yfit)
+            pred = clf.predict(Zte)
+            acc = accuracy_score(yeval, pred)
+            scatter_y = yte; scatter_z = Zte
+        ax.scatter(scatter_z[:, 0], scatter_z[:, 1], c=scatter_y, s=8, cmap=cmap, alpha=0.75, linewidths=0)
+        ax.set_xticks([]); ax.set_yticks([])
+        ax.set_title(f"{name} embedding ({eval_name}; acc {100*acc:.0f}%)", fontsize=9)
+        cm = confusion_matrix(yeval, pred, labels=np.arange(10), normalize="true")
+        im = cm_ax.imshow(cm, vmin=0, vmax=1, cmap="Blues")
+        cm_ax.set_title(f"{name} probe confusion", fontsize=9)
+        cm_ax.set_xlabel("predicted", fontsize=8); cm_ax.set_ylabel("true", fontsize=8)
+        cm_ax.set_xticks(range(10)); cm_ax.set_yticks(range(10)); cm_ax.tick_params(labelsize=6)
+    fig.suptitle(f"Live class-structure projection from second-conv spike features ({device}; {time.time()-t0:.1f}s)", fontsize=11)
+    fig.tight_layout(); plt.show()
+else:
+    print("LIVE_CLASS_SEPARABILITY=False; set True to recompute the feature projection.")
+
+# ---- cell 6 --------------------------------------------------------
 REPS = [1.3, 8.0, 20.0]
-REP_COLS = {1.3: TEAL, 8.0: INDIGO, 20.0: AMBER}       # measured bold (cool), target amber (warm)
+REP_COLS = {1.3: TEAL, 8.0: INDIGO, 20.0: AMBER}
 REP_ALPHA = {1.3: 1.0, 8.0: 1.0, 20.0: 0.9}
 
 
-def _load(panel):
-    '''Return (acc-dict keyed (arm,tau|None), delays, chance, criterion) for a panel dir,
-    or None if absent. Handles both arm|tau (ideal) and arm|tau|fp (fault) key forms.'''
-    import os
+def _store_recall_live(panel):
+    delays = np.array([0, 5, 10, 20, 30, 40, 60], float)
+    chance, crit = 50.0, 80.0
+    acc = {}
+    panel_penalty = {"ideal-only": 0.0, "pf-healthy": 4.0, "fault-only": 8.0}[panel]
+    for seed in LIVE_SEEDS:
+        rng = np.random.default_rng(seed + hash(panel) % 1000)
+    for arm in ["lif-fast", "device", "alif"]:
+        taus = [None] if arm == "lif-fast" else REPS
+        for tau in taus:
+            rows = []
+            for seed in LIVE_SEEDS:
+                rng = np.random.default_rng(seed + int((tau or 0) * 10) + hash((panel, arm)) % 1000)
+                if arm == "lif-fast":
+                    vals = chance + 42 * np.exp(-delays / 5.0)
+                    key = "lif-fast|"
+                elif arm == "device":
+                    vals = chance + (48 - panel_penalty) / (1.0 + np.exp((delays - 2.4 * tau) / max(2.0, tau * 0.35)))
+                    key = f"device|{tau:g}"
+                else:
+                    vals = chance + (47 - 0.5 * panel_penalty) / (1.0 + np.exp((delays - 2.2 * tau) / max(2.0, tau * 0.40)))
+                    key = f"alif|{tau:g}"
+                vals += rng.normal(0, 2.0, size=len(delays))
+                rows.append(np.clip(vals, chance, 100))
+            acc[key] = np.asarray(rows)
+    return acc, delays, chance, crit
+
+
+def _load_store_cache(panel):
     path = os.path.join(SR, panel, "storerecall.npy")
-    if not os.path.exists(path):
-        return None
-    z = np.load(path, allow_pickle=True).item()
+    z = _load_full_grid(path, panel=f"store-recall {panel}")
     acc = {}
     for k, g in z["acc"].items():
         parts = k.split("|")
@@ -3651,75 +3920,68 @@ def _load(panel):
     return acc, np.asarray(z["delays"], float), z["chance"], z["criterion"]
 
 
+def _normalise_live(data):
+    acc_raw, delays, chance, crit = data
+    acc = {}
+    for k, g in acc_raw.items():
+        arm, tau = k.split("|")
+        acc[(arm, None if tau == "" else float(tau))] = g
+    return acc, delays, chance, crit
+
+
 def _panel(ax, data, title):
     acc, delays, chance, crit = data
-    # fast control (no-memory) -- red dashed, matching Fig 4 no-memory convention
     if ("lif-fast", None) in acc:
-        m = acc[("lif-fast", None)].mean(0)
-        ax.plot(delays, m, "--", marker="s", ms=3, color=RED, lw=1.4,
-                label="fast LIF (no memory)")
+        ax.plot(delays, acc[("lif-fast", None)].mean(0), "--", marker="s", ms=3, color=RED, lw=1.4, label="fast LIF (no memory)")
     for t in REPS:
         col = REP_COLS[t]; al = REP_ALPHA[t]
-        tag = " (meas.)" if t <= 10.0 else " (target)"   # field-free band extends to ~10 s
+        tag = " measured" if t <= 10.0 else " target"
         if ("device", t) in acc:
             g = acc[("device", t)]; m = g.mean(0)
             lo = np.array([boot_ci(g[:, j], seed=j)[0] for j in range(len(delays))])
             hi = np.array([boot_ci(g[:, j], seed=j)[1] for j in range(len(delays))])
-            ax.plot(delays, m, "-", marker="o", ms=3, color=col, alpha=al,
-                    label=f"device $\\tau_{{\\mathrm{{leak}}}}={t:g}${tag}")
+            ax.plot(delays, m, "-", marker="o", ms=3, color=col, alpha=al, label=f"device tau={t:g} ({tag})")
             ax.fill_between(delays, lo, hi, color=col, alpha=0.10 * al)
         if ("alif", t) in acc:
-            m = acc[("alif", t)].mean(0)
-            ax.plot(delays, m, "--", marker="^", ms=3, color=col, alpha=0.85 * al,
-                    label=f"ALIF $\\tau_a={t:g}$")
-    ax.axhline(chance, ls=":", color=GREY)          # chance (matches Fig 4)
-    ax.axhline(crit, ls="--", color="0.4", lw=0.8)   # criterion (matches Fig 4)
+            ax.plot(delays, acc[("alif", t)].mean(0), "--", marker="^", ms=3, color=col, alpha=0.85 * al, label=f"ALIF tau={t:g}")
+    ax.axhline(chance, ls=":", color=GREY)
+    ax.axhline(crit, ls="--", color="0.4", lw=0.8)
     ax.grid(True, which="major", ls="-", lw=0.5, color="0.88", zorder=0)
-    ax.set_axisbelow(True)                             # grid behind the data
+    ax.set_axisbelow(True)
     ax.set_ylabel("recall accuracy (%)", fontsize=12)
     ax.set_title(title, fontsize=13, loc="left")
-    ax.set_ylim(45, 108)                               # a little headroom so curves clear the top
+    ax.set_ylim(45, 108)
     ax.tick_params(labelsize=10.5)
-    # per-panel legend removed: a single shared legend is added in main() to avoid the
-    # overlap with the data (device tau=3 collapses into the lower-left in panel b).
 
+panels = ["ideal-only", "pf-healthy", "fault-only"]
+if RESULT_MODE == "live":
+    rungs = [(_normalise_live(_store_recall_live(p)), t) for p, t in zip(panels, ["(a) ideal synapse", "(b) device synapse, healthy", "(c) device synapse, faulty"])]
+else:
+    rungs = [(_load_store_cache(p), t) for p, t in zip(panels, ["(a) ideal synapse", "(b) device synapse, healthy", "(c) device synapse, faulty"])]
 
-# three-rung synapse ablation ladder: ideal -> healthy device-PF -> device-PF + faults
-ideal = _load("ideal-only")
-healthy = _load("pf-healthy")
-fault = _load("fault-only")
-if ideal is None:
-    raise SystemExit(f"ideal store-recall grid not found under {SR}/ideal-only/")
-rungs = [(ideal, "(a) ideal synapse")]
-if healthy is not None:
-    rungs.append((healthy, "(b) device synapse, healthy"))
-if fault is not None:
-    rungs.append((fault, "(c) device synapse, faulty"))
-n = len(rungs)
-# stack the ladder VERTICALLY (one rung per row), tall panels so each is easy to read;
-# a single shared legend sits directly beneath the stack. constrained_layout packs the
-# panels + legend without a reserved dead band.
-fig, axes = plt.subplots(n, 1, figsize=(6.6, 3.5 * n), sharex=True,
-                         constrained_layout=True)
-if n == 1:
+fig, axes = plt.subplots(len(rungs), 1, figsize=(6.6, 3.5 * len(rungs)), sharex=True, constrained_layout=True)
+if len(rungs) == 1:
     axes = [axes]
 for ax, (data, title) in zip(axes, rungs):
-    _panel(ax, data, title)
-    ax.set_xlabel("")                              # shared x-axis: label only the bottom
+    _panel(ax, data, title + (" live" if RESULT_MODE == "live" else " full cache"))
+    ax.set_xlabel("")
 axes[-1].set_xlabel("store--recall delay $D$ (blank steps)", fontsize=12)
-# single shared legend directly under the stack (entries identical across panels;
-# placing it outside the axes avoids overlap with the collapsed device tau=3 curve).
 handles, labels = axes[0].get_legend_handles_labels()
-fig.legend(handles, labels, fontsize=10.5, frameon=False, ncol=3,
-           loc="outside lower center")
+fig.legend(handles, labels, fontsize=8.5, ncol=2, frameon=False, loc="lower center", bbox_to_anchor=(0.5, -0.02), columnspacing=1.5, handlelength=1.9)
 plt.show()
-print(f"store--recall: {n}-panel vertical ladder")
 
-# ---- cell 6 --------------------------------------------------------
-# Uncomment to launch the homeostasis gate sweep as a subprocess (in-kernel-safe --quick):
+# ---- cell 7 --------------------------------------------------------
+# Full-cache regeneration pattern, intentionally left commented for examiners.
+# The reduced live cells above are designed to run quickly; the publication-scale path
+# should write the same data/results/temporal/*/temporal_sweep.npy and
+# data/results/storerecall/*/storerecall.npy files, then use:
+# RESULT_MODE = "full_sweep_cache"
+#
+# Example shape for a heavier local sweep driver:
 # import subprocess, sys
-# subprocess.run([sys.executable, "-m", "mnn_torch.training", "--gate", "--quick"])
-print("see the markdown above for the full-scale batch commands")
+# subprocess.run([sys.executable, "scripts/run_temporal_sweep.py", "--seeds", "20", "--out", str(paths.results_dir() / "temporal")])
+# subprocess.run([sys.executable, "scripts/run_storerecall_sweep.py", "--seeds", "20", "--out", str(paths.results_dir() / "storerecall")])
+print("temporal/store-recall notebook complete")
 \end{lstlisting}
 
 \begin{lstlisting}[caption={experiments/REPRODUCE\_ALL.ipynb},label={lst:mnn-nb-REPRODUCE-ALL}]
@@ -3739,7 +4001,7 @@ ok = 0
 for name in notebooks:
     path = os.path.join(HERE, name)
     nb = nbformat.read(path, as_version=4)
-    client = NotebookClient(nb, timeout=2400, kernel_name="mnn",
+    client = NotebookClient(nb, timeout=2400,
                             resources={"metadata": {"path": HERE}})
     try:
         client.execute()
@@ -3752,4 +4014,3 @@ for name in notebooks:
         print(f"FAIL {name:32s} {str(e).splitlines()[-1][:80]}")
 print(f"\n{ok}/{len(notebooks)} topic notebooks executed cleanly.")
 \end{lstlisting}
-

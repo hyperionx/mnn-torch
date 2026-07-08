@@ -181,10 +181,16 @@ cython_debug/
 ehthumbs.db
 Thumbs.db
 
-# Data files (optional - uncomment if you don't want to track data)
-data/
+# Data files: keep bulky downloaded/raw datasets ignored, but allow the small
+# publication replay fixtures under data/results and the bundled SiOx fixture.
+data/*
+!data/results/
+!data/results/**
+!data/SiO_x-multistate-data.mat
 *.mat
+!data/SiO_x-multistate-data.mat
 *.csv
+!data/results/**/*.csv
 
 # Model checkpoints and logs
 checkpoints/
