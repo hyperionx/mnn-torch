@@ -1,43 +1,55 @@
-# Experiments (Reproducibility Snapshot)
+# Publication reproduction notebooks
 
-This directory contains the definitive reproducibility notebooks for the `mnn-torch` package. These notebooks run the core experiments and regenerate the publication-facing figures.
+The four topic notebooks are the figure-generation source. They display all
+figures inline and do not write image files unless `MNN_SAVE_FIGURES=1` is set.
+`REPRODUCE.ipynb` executes them in canonical order and validates the 17-figure
+contract, including the seven active manuscript figures.
 
-## The Notebooks
+Every topic notebook exposes the same controls:
 
-### 1. `examples.ipynb`
-Trains the memristive MSNN/MCSNN on MNIST with the Poole-Frenkel device forward map.
-
-### 2. `homeostasis.ipynb`
-Runs the fault-recovery sweep (with the homeostatic regulariser on versus off under the stuck-at prior) and reports the recovery gap by fault polarity.
-
-### 3. `temporal_storerecall.ipynb`
-Runs reduced-budget temporal-memory, retention, class-structure, and store-recall computations by default, with an explicit full-sweep cache-rendering mode for heavier outputs.
-
-### 4. `REPRODUCE_ALL.ipynb`
-A master runner that executes all of the topic notebooks automatically.
-
-## Running the Experiments
-
-By default, the notebooks run in `RESULT_MODE = "live"` and compute reduced-budget versions of the result panels directly from the package code.
-
-Set `RESULT_MODE = "full_sweep_cache"` only when you want to render committed outputs from heavier publication-scale sweeps. Those cells print the cache source/provenance and include commented command patterns for regenerating the data.
-
-You can generate the available diagnostic grids from the command line (make sure to run these from the `mnn_torch` conda environment, which has the necessary CUDA configuration):
-
-```bash
-# 1. Generate the homeostasis gate sweep
-conda run -n mnn_torch python -m mnn_torch.training --gate
-
-# 2. Generate the dose-response evaluation for different fault rates
-conda run -n mnn_torch python -m mnn_torch.training --dose --rate 0.0
-conda run -n mnn_torch python -m mnn_torch.training --dose --rate 0.2
-conda run -n mnn_torch python -m mnn_torch.training --dose --rate 0.4
-
-# 3. Generate the forward map vs. sampler ablations (Isolate Collapse)
-conda run -n mnn_torch python -m mnn_torch.training --isolate --map pf --mode device
-conda run -n mnn_torch python -m mnn_torch.training --isolate --map pf --mode fixed
-conda run -n mnn_torch python -m mnn_torch.training --isolate --map ohmic --mode device
-conda run -n mnn_torch python -m mnn_torch.training --isolate --map ohmic --mode fixed
+```python
+RUN_PROFILE = "reduced"       # reduced | publication | smoke
+DEVICE = "auto"               # CUDA, then MPS, then CPU
+WORKERS = "auto"
+SAVE_FIGURES = False
+OUTPUT_DIR = ...
+OVERWRITE = False
+RUN_EXTERNAL_DATA = False
+ALLOW_DATA_DOWNLOADS = False
 ```
 
-*Note: The commands above run the default quick diagnostic grids. To run heavier publication-scale diagnostic grids, append the `--full` flag where supported. Notebook figures should be generated from code in live mode; cached arrays are an explicit full-sweep rendering path, not the default.*
+- `01_device_and_static.ipynb` covers measured device panels, authored
+  architecture, schematics, and static-network results.
+- `02_homeostasis.ipynb` runs paired reduced `MSNN`/`TemporalMCSNN`
+  architecture-dependence experiments, then covers the liability/asset
+  mechanism, fault-confusion, and reduced feature-map diagnostics.
+- `03_temporal_memory.ipynb` generates temporal architectures and runs genuine
+  reduced retention, store-recall, and four-dataset capability experiments by
+  default. Set `MNN_USE_TEMPORAL_ARCHIVE=1` with the `publication` profile to
+  replay a provenance-complete full-sweep archive; without one, publication
+  mode displays the read-only manuscript targets.
+- `04_representations.ipynb` runs genuine reduced N-MNIST `TemporalMCSNN` and
+  MNE EEG `MCSNN` experiments by default and extracts their conv2 spikes live.
+  It also documents explicit full-dataset downloads and strict optional
+  long-run archive replay.
+
+The `publication` profile redraws measured records, validated sample archives,
+and authored assets without automatically launching expensive training. `smoke`
+is offline and minimal. Summary-only aggregates are not accepted as figure data.
+References under `assets/references/` are read-only visual targets, never
+regenerated evidence.
+
+The committed temporal fixture contains deterministic class-balanced source
+samples from N-MNIST, SHD, and DVS Gesture; seq-MNIST reuses the genuine MNIST
+fixture. Reduced runs use a nonstandard small repartition and three seeds, so
+their scores and broad confidence intervals are explicitly labelled reduced
+validation. They support mechanism and trend checks, not numerical replacement
+of the 20-seed manuscript sweep.
+
+The representation notebook needs no download for reduced or smoke execution.
+Its fixture contains 60 genuine N-MNIST samples per class framed into ten bins
+and 64 genuine MNE auditory/visual EEG epochs per class. Set both
+`MNN_ALLOW_DATA_DOWNLOADS=1` and `MNN_DOWNLOAD_REPRESENTATION_DATA=1` only to
+obtain the full upstream sources. Saving is refused for reference-only and
+placeholder figures; manuscript directories and existing targets additionally
+require `MNN_OVERWRITE=1`.
