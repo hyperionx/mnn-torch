@@ -59,16 +59,26 @@ def ensure_mnist(data_dir=None):
     return data_dir
 
 
-def mnist_loaders(data_dir=None, seed=0, batch_size=64, train_subset=None,
-                  test_subset=None):
+def mnist_loaders(
+    data_dir=None,
+    seed=0,
+    batch_size=64,
+    train_subset=None,
+    test_subset=None,
+    *,
+    num_workers=0,
+    pin_memory=None,
+    persistent_workers=False,
+):
     """Build seeded MNIST train/test ``DataLoader`` pairs.
 
     Lifted from ``gate_homeostasis_recovery._data_loaders``: the train loader is
     shuffled under a per-run ``torch.Generator`` seed and drops the last partial
     batch; the test loader is deterministic. ``train_subset`` / ``test_subset``
-    (if given) take the leading ``n`` examples for a fast smoke run. Assumes
-    MNIST is already present (see :func:`ensure_mnist`); opens with
-    ``download=False``.
+    (if given) take the leading ``n`` examples for a fast smoke run. ``pin_memory``
+    defaults to CUDA availability and the worker controls are optional, preserving
+    the historical single-process behaviour. Assumes MNIST is already present (see
+    :func:`ensure_mnist`); opens with ``download=False``.
     """
     import torch
     import torchvision
@@ -83,11 +93,19 @@ def mnist_loaders(data_dir=None, seed=0, batch_size=64, train_subset=None,
         train = Subset(train, range(train_subset))
     if test_subset:
         test = Subset(test, range(test_subset))
+    if pin_memory is None:
+        pin_memory = bool(torch.cuda.is_available())
+    num_workers = int(num_workers)
+    persistent_workers = bool(persistent_workers and num_workers > 0)
     g = torch.Generator().manual_seed(seed)
     train_loader = DataLoader(train, batch_size=batch_size, shuffle=True,
-                              drop_last=True, generator=g)
+                              drop_last=True, generator=g, num_workers=num_workers,
+                              pin_memory=pin_memory,
+                              persistent_workers=persistent_workers)
     test_loader = DataLoader(test, batch_size=batch_size, shuffle=False,
-                             drop_last=True)
+                             drop_last=True, num_workers=num_workers,
+                             pin_memory=pin_memory,
+                             persistent_workers=persistent_workers)
     return train_loader, test_loader
 
 

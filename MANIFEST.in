@@ -1,12 +1,19 @@
 # Include documentation
 include README.md
 include LICENSE
-include CHANGELOG.rst
-include CONTRIBUTING.rst
-include AUTHORS.rst
+include CITATION.cff
+include pyproject.toml
 
-# Include examples
-recursive-include examples *.py *.ipynb *.md
+# Include publication-reproduction notebooks and lightweight metadata
+recursive-include experiments *.ipynb *.md *.json *.csv *.npz *.png
+include data/SiO_x-multistate-data.mat
+include data/fig6_devicefixed_data.json
+include data/fig6_devicefixed_data.README.md
+include data/results/homeostasis_sample_archive.npz
+include data/fixtures/homeostasis_reduced_datasets.npz
+include data/fixtures/temporal_reduced_datasets.npz
+include data/fixtures/representations_reduced_datasets.npz
+include data/fixtures/README.md
 
 # Include tests
 recursive-include tests *.py
@@ -18,7 +25,6 @@ recursive-include docs *.rst *.py *.txt Makefile
 exclude uv.lock
 exclude .python-version
 exclude main.py
-recursive-exclude data *
 recursive-exclude * __pycache__
 recursive-exclude * *.py[co]
 recursive-exclude * .DS_Store

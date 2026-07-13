@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "figure_count": 17,
-  "active_manuscript_count": 7,
+  "active_manuscript_count": 8,
   "provenance_classes": ["live-exact", "live-reduced", "published-aggregate", "published-sample-archive", "immutable-authored", "external-gated", "reference-only", "placeholder"],
   "figures": [
     {"filename":"fig1_iv-sweeps.png","tier":"main","notebook":"01_device_and_static.ipynb","profile":"publication","device":"any","seeds":[],"data_hash":"a07035682c4310988dedb697ebfcb5a302e447aaffb89309ba1a99812189ddf6","reference_hash":"cb52821094e07ed840a13111484e25c00297bed04f1dea0797bafd69642576c3","provenance_class":"live-exact","claim_status":"claimable"},
@@ -12,7 +12,7 @@
     {"filename":"fig4_mcsnn-training.png","tier":"context","notebook":"01_device_and_static.ipynb","profile":"publication","device":"any","seeds":[0,1,2],"data_hash":"60b36f0e11c92fdd3ee09a6a6803419803f6c77ffcf1e12b100ec0db56422306","reference_hash":"3af028f4bad82f2cd34f3d8655ac972f3519d35ffe8ea01016374fbb997cfa6f","provenance_class":"published-sample-archive","claim_status":"claimable-from-published-seed-archive"},
     {"filename":"snn_schematic.png","tier":"context","notebook":"01_device_and_static.ipynb","profile":"publication","device":"any","seeds":[20260616],"data_hash":null,"reference_hash":"3460d111307f22164d7253a66863ccca65cf6424f3378e3f56c66dd4f5c72270","provenance_class":"live-exact","claim_status":"claimable"},
     {"filename":"fig_homeostasis_arch.png","tier":"context","notebook":"02_homeostasis.ipynb","profile":"reduced","device":"cuda-preferred","seeds":[0,1,2],"data_hash":"5efbda60d371596f11fdbc0cff7f240509621c53f05aa6fb37792e729aacd05c","reference_hash":"155db766d379251d4e4754aa2c8794edc8cb634d17187bb413909fc168eba239","provenance_class":"live-reduced","claim_status":"reduced-validation"},
-    {"filename":"fig_liability_asset.png","tier":"context","notebook":"02_homeostasis.ipynb","profile":"publication","device":"any","seeds":[],"data_hash":null,"reference_hash":"90f5fe82b7cef6a8f11a674d6e108917a84aa6d5c5c3463b8ebd4316d6d61562","provenance_class":"live-exact","claim_status":"claimable"},
+    {"filename":"fig_liability_asset.png","tier":"main","notebook":"02_homeostasis.ipynb","profile":"publication","device":"any","seeds":[],"data_hash":null,"reference_hash":"6a56d9dc89079ba9098b1383c2588990aa81f6b25d04206b2bd1f376403fee35","provenance_class":"live-exact","claim_status":"claimable"},
     {"filename":"fig_confusion-faults.png","tier":"context","notebook":"02_homeostasis.ipynb","profile":"reduced","device":"cuda-preferred","seeds":[0],"data_hash":"dde0300063e76894c6591a3b337961def83416a2421941798712a2f548024c00","reference_hash":"20e884722b85172a446b969fea1151dec8f2d83dede8f2442ee03d0a24e32789","provenance_class":"live-reduced","claim_status":"reduced-validation"},
     {"filename":"homeostatic_feature_maps.png","tier":"context","notebook":"02_homeostasis.ipynb","profile":"reduced","device":"cuda-preferred","seeds":[0],"data_hash":"dde0300063e76894c6591a3b337961def83416a2421941798712a2f548024c00","reference_hash":"7df1b5ec042756b13a628c8007a1b42d7d5f79eb829fb3606613c791cc32544a","provenance_class":"live-reduced","claim_status":"reduced-validation"},
     {"filename":"fig_temporal_arch.png","tier":"main","notebook":"03_temporal_memory.ipynb","profile":"publication","device":"any","seeds":[],"data_hash":null,"reference_hash":"92f3d210d809f43e660f2493a461be0a13026181d8bf79ccfe62a484b3f0759f","provenance_class":"live-exact","claim_status":"claimable"},

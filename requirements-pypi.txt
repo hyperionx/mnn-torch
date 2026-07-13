@@ -1,11 +1,12 @@
 # Core dependencies for PyPI package
-torch>=2.8.0
-torchvision>=0.23.0
-numpy>=2.2.6
+torch==2.12.1
+torchvision==0.27.1
+numpy>=1.26,<2.0
 scipy>=1.14.0
 scikit-learn>=1.7.2
 snntorch>=0.9.4
 
-# Optional dependencies for development and examples
-jupyter>=1.1.1
-matplotlib>=3.10.6
+# Install notebook tooling with: pip install -e ".[repro]"
+# Install external-data adapters with: pip install -e ".[external]"
+# For CUDA on Windows/Linux, install Torch from the official cu130 index first;
+# see README.md. PyPI's Windows wheel is CPU-only.

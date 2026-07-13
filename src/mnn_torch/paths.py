@@ -1,11 +1,12 @@
-"""Filesystem paths for the bundled device fixture and result grids.
+"""Filesystem paths for bundled fixtures, generated figures, and result grids.
 
-The experiments in this package are reproduced by notebooks under ``experiments/``
-that hold no code themselves: they call the ``run_*`` helpers in the library and read
-or write result grids under the top-level ``data/`` directory. This module is the one
-place that resolves ``data/`` so that both the notebooks and the module ``main()``
-entry points (``python -m mnn_torch.training --full``) agree on where results live,
-regardless of the current working directory.
+The publication-facing notebooks under ``experiments/`` call package helpers that
+render reduced live figures by default.  Heavier publication-scale result grids
+live under the top-level ``data/results`` directory and are used only when a
+notebook or script is explicitly switched to ``RESULT_MODE='full_sweep_cache'``.
+This module is the one place that resolves ``data/`` so notebooks and command-line
+entry points agree on where fixtures and caches live, regardless of the current
+working directory.
 
 Because the package is installed editable, ``__file__`` resolves inside the real
 repository ``src/`` tree, so the repository root -- and its sibling ``data/`` -- is

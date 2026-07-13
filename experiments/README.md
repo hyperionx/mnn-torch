@@ -3,7 +3,7 @@
 The four topic notebooks are the figure-generation source. They display all
 figures inline and do not write image files unless `MNN_SAVE_FIGURES=1` is set.
 `REPRODUCE.ipynb` executes them in canonical order and validates the 17-figure
-contract, including the seven active manuscript figures.
+contract, including the eight active manuscript figures.
 
 Every topic notebook exposes the same controls:
 

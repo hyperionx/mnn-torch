@@ -159,7 +159,13 @@ def _make_config(dev_params, *, prob, homeo, disturb_mode="device_fixed",
 # ==========================================================================
 # Evaluate / train (shared by every arm)
 # ==========================================================================
-def evaluate_snn(net, loader, device):
+def _move_to_device(tensor, device):
+    """Move a batch to ``device`` and use asynchronous copies for pinned CUDA data."""
+    device_type = getattr(device, "type", str(device).split(":", 1)[0])
+    return tensor.to(device, non_blocking=(device_type == "cuda"))
+
+
+def evaluate_snn(net, loader, device, *, return_predictions=False):
     """Rate-coded top-1 accuracy (%) of ``net`` on ``loader``.
 
     Prediction = argmax of the summed output spike train (rate code), matching
@@ -169,15 +175,22 @@ def evaluate_snn(net, loader, device):
 
     net.eval()
     correct = total = 0
+    all_targets, all_predictions = [], []
     with torch.no_grad():
         for x, y in loader:
-            x = x.view(x.shape[0], -1).to(device)
-            y = y.to(device)
+            x = _move_to_device(x.view(x.shape[0], -1), device)
+            y = _move_to_device(y, device)
             spk, _ = net(x)
             pred = spk.sum(dim=0).argmax(dim=1)
             correct += (pred == y).sum().item()
             total += y.shape[0]
-    return 100.0 * correct / total
+            if return_predictions:
+                all_targets.append(y.detach().cpu().numpy())
+                all_predictions.append(pred.detach().cpu().numpy())
+    accuracy = 100.0 * correct / total
+    if return_predictions:
+        return accuracy, np.concatenate(all_targets), np.concatenate(all_predictions)
+    return accuracy
 
 
 def train_snn(cfg, loaders, device, *, seed, epochs, num_steps, lr):
@@ -202,8 +215,8 @@ def train_snn(cfg, loaders, device, *, seed, epochs, num_steps, lr):
     for _ in range(epochs):
         net.train()
         for x, y in train_loader:
-            x = x.view(x.shape[0], -1).to(device)
-            y = y.to(device)
+            x = _move_to_device(x.view(x.shape[0], -1), device)
+            y = _move_to_device(y, device)
             spk, _ = net(x)
             loss = loss_fn(spk.sum(dim=0), y)  # rate-coded CE on summed spikes
             opt.zero_grad()
@@ -241,9 +254,24 @@ def run_condition(job):
     cfg = _make_config(job["dev_params"], prob=job["prob"], homeo=job["homeo"],
                        disturb_mode=job["disturb_mode"],
                        stuck_polarity=job["stuck_polarity"])
-    train_loader, test_loader = mnist_loaders(
-        job["data"], seed=job["seed"], batch_size=job["batch_size"],
-        train_subset=job["train_subset"], test_subset=job["test_subset"])
+    if job.get("fixture") is not None:
+        from torch.utils.data import DataLoader, TensorDataset
+        fx = job["fixture"]
+        train_loader = DataLoader(
+            TensorDataset(torch.as_tensor(fx["train_x"], dtype=torch.float32),
+                          torch.as_tensor(fx["train_y"], dtype=torch.long)),
+            batch_size=job["batch_size"], shuffle=True,
+            generator=torch.Generator().manual_seed(job["seed"]),
+        )
+        test_loader = DataLoader(
+            TensorDataset(torch.as_tensor(fx["test_x"], dtype=torch.float32),
+                          torch.as_tensor(fx["test_y"], dtype=torch.long)),
+            batch_size=job["batch_size"], shuffle=False,
+        )
+    else:
+        train_loader, test_loader = mnist_loaders(
+            job["data"], seed=job["seed"], batch_size=job["batch_size"],
+            train_subset=job["train_subset"], test_subset=job["test_subset"])
     net = MSNN(28 * 28, 100, 10, num_steps=job["num_steps"], beta=0.95,
                memristive_config=cfg).to(device)
     opt = torch.optim.Adam(net.parameters(), lr=job["lr"])
@@ -251,15 +279,22 @@ def run_condition(job):
     for _ in range(job["epochs"]):
         net.train()
         for x, y in train_loader:
-            x = x.view(x.shape[0], -1).to(device)
-            y = y.to(device)
+            x = _move_to_device(x.view(x.shape[0], -1), device)
+            y = _move_to_device(y, device)
             spk, _ = net(x)
             loss = loss_fn(spk.sum(dim=0), y)  # rate-coded CE on summed spikes
             opt.zero_grad()
             loss.backward()
             opt.step()
     job = dict(job)
-    job["acc"] = evaluate_snn(net, test_loader, device)
+    evaluated = evaluate_snn(
+        net, test_loader, device,
+        return_predictions=bool(job.get("return_predictions", False)),
+    )
+    if job.get("return_predictions", False):
+        job["acc"], job["targets"], job["predictions"] = evaluated
+    else:
+        job["acc"] = evaluated
     return job
 
 
@@ -309,10 +344,10 @@ def pick_device(requested):
 
     if requested != "auto":
         return requested
-    if torch.backends.mps.is_available():
-        return "mps"
     if torch.cuda.is_available():
         return "cuda"
+    if torch.backends.mps.is_available():
+        return "mps"
     return "cpu"
 
 

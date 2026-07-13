@@ -1,49 +1,12 @@
-.. These are examples of badges you might want to add to your README:
-   please update the URLs accordingly
-
-    .. image:: https://api.cirrus-ci.com/github/<USER>/mnn-torch.svg?branch=main
-        :alt: Built Status
-        :target: https://cirrus-ci.com/github/<USER>/mnn-torch
-    .. image:: https://readthedocs.org/projects/mnn-torch/badge/?version=latest
-        :alt: ReadTheDocs
-        :target: https://mnn-torch.readthedocs.io/en/stable/
-    .. image:: https://img.shields.io/coveralls/github/<USER>/mnn-torch/main.svg
-        :alt: Coveralls
-        :target: https://coveralls.io/r/<USER>/mnn-torch
-    .. image:: https://img.shields.io/pypi/v/mnn-torch.svg
-        :alt: PyPI-Server
-        :target: https://pypi.org/project/mnn-torch/
-    .. image:: https://img.shields.io/conda/vn/conda-forge/mnn-torch.svg
-        :alt: Conda-Forge
-        :target: https://anaconda.org/conda-forge/mnn-torch
-    .. image:: https://pepy.tech/badge/mnn-torch/month
-        :alt: Monthly Downloads
-        :target: https://pepy.tech/project/mnn-torch
-    .. image:: https://img.shields.io/twitter/url/http/shields.io.svg?style=social&label=Twitter
-        :alt: Twitter
-        :target: https://twitter.com/mnn-torch
-
-.. image:: https://img.shields.io/badge/-PyScaffold-005CA0?logo=pyscaffold
-    :alt: Project generated with PyScaffold
-    :target: https://pyscaffold.org/
-
-|
-
 =========
 mnn-torch
 =========
 
+``mnn-torch`` is a PyTorch reference implementation of device-grounded
+memristive spiking neural networks. It provides independently installable model
+code and publication-reproduction notebooks with explicit provenance, bounded
+run profiles, external-data gates, and opt-in figure saving.
 
-    Add a short description here!
-
-
-A longer description of your project goes here...
-
-
-.. _pyscaffold-notes:
-
-Note
-====
-
-This project has been set up using PyScaffold 4.4.1. For details and usage
-information on PyScaffold see https://pyscaffold.org/.
+The maintained installation and reproduction guide is the repository's
+``README.md``. Citation metadata is available in ``CITATION.cff`` and the
+software is distributed under the MIT licence.
