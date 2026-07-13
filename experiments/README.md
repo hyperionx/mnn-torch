@@ -36,7 +36,7 @@ The **`reduced`** profile is the default active mode for running the networks li
 
 ### 2. `publication` (Strict Reproducibility)
 The **`publication`** profile strictly redraws measured records, validated sample archives, and authored assets without automatically launching expensive training. 
-- For static records (`01_device_and_static`), it replays the committed `data/fig6_devicefixed_data.json` archive.
+- For static records (`01_device_and_static`), it replays the committed `data/devicefixed_data.json` archive.
 - For heavy 20-seed sweeps (`03_temporal_memory` and `04_representations`), it requires explicitly injecting full long-run archive replays (e.g., `MNN_USE_TEMPORAL_ARCHIVE=1`). 
 - **Read-Only Fallback:** If the heavy full-sweep archives are not present (which are omitted from Git due to size), `publication` mode will gracefully fall back to displaying the read-only manuscript reference images from `assets/references/`. Summary-only `.npy` aggregates are explicitly forbidden and rejected as figure data to maintain provenance rigor.
 

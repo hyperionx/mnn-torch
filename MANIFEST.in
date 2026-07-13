@@ -7,8 +7,8 @@ include pyproject.toml
 # Include publication-reproduction notebooks and lightweight metadata
 recursive-include experiments *.ipynb *.md *.json *.csv *.npz *.png
 include data/SiO_x-multistate-data.mat
-include data/fig6_devicefixed_data.json
-include data/fig6_devicefixed_data.README.md
+include data/devicefixed_data.json
+include data/devicefixed_data.README.md
 include data/results/homeostasis_sample_archive.npz
 include data/fixtures/homeostasis_reduced_datasets.npz
 include data/fixtures/temporal_reduced_datasets.npz

@@ -71,8 +71,8 @@ epochs using the publication model's ten simulation steps;
 they are labelled as reduced validation rather than publication evidence. The
 `smoke` profile likewise executes real model forwards on a tiny offline fixture.
 Only `publication` replays the committed long-run
-[`data/fig6_devicefixed_data.json`](data/fig6_devicefixed_data.json) archive.
-Its adjacent [schema note](data/fig6_devicefixed_data.README.md) documents the
+[`data/devicefixed_data.json`](data/devicefixed_data.json) archive.
+Its adjacent [schema note](data/devicefixed_data.README.md) documents the
 three-seed, twelve-epoch record. Set `MNN_GENERATE_STATIC_ARCHIVE=1` only to
 persist an explicitly selected live run. Alternate device and architecture
 views in the first notebook are hidden by

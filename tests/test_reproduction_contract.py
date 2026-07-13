@@ -63,7 +63,7 @@ def test_vendored_reference_hashes():
 def test_static_training_curves_use_the_real_seed_archive():
     manifest = json.loads((ROOT / "experiments" / "figure_manifest.json").read_text())
     by_name = {row["filename"]: row for row in manifest["figures"]}
-    archive_path = ROOT / "data" / "fig6_devicefixed_data.json"
+    archive_path = ROOT / "data" / "devicefixed_data.json"
     archive_hash = hashlib.sha256(archive_path.read_bytes()).hexdigest()
     for name in ("fig3_msnn-training.png", "fig4_mcsnn-training.png"):
         assert by_name[name]["provenance_class"] == "published-sample-archive"
@@ -75,7 +75,7 @@ def test_static_training_curves_use_the_real_seed_archive():
 def test_static_training_archive_schema_is_rectangular_and_finite():
     import numpy as np
 
-    archive = json.loads((ROOT / "data" / "fig6_devicefixed_data.json").read_text())
+    archive = json.loads((ROOT / "data" / "devicefixed_data.json").read_text())
     config = archive["config"]
     assert config["seeds"] == [0, 1, 2]
     assert config["epochs"] == 12
@@ -165,7 +165,7 @@ def test_appendix_generators_replace_approximate_blocks():
     temporal = code("03_temporal_memory.ipynb")
     assert "memristive crossbar $G_{ij}$" in static
     assert "ref_windows" in static and "forward-Euler" in static
-    assert 'DATA = ROOT / "data" / "fig6_devicefixed_data.json"' in static
+    assert 'DATA = ROOT / "data" / "devicefixed_data.json"' in static
     assert "generate_static_archive" in static and "precompute_device_params" in static
     assert "from mnn_torch.models import MSNN, MCSNN" in static
     assert 'for arch in config["archs"]' in static

@@ -184,8 +184,8 @@ Thumbs.db
 # Data files: keep bulky downloaded/raw datasets ignored, but allow the small
 # publication replay fixtures under data/results and the bundled SiOx fixture.
 data/*
-!data/fig6_devicefixed_data.json
-!data/fig6_devicefixed_data.README.md
+!data/*.json
+!data/*.README.md
 !data/results/
 !data/results/**
 !data/fixtures/
