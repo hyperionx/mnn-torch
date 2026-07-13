@@ -206,6 +206,7 @@ runs/
 # Temporary files
 *.tmp
 *.temp
+*.npy
 
 # Reproducibility notebook outputs
 experiments/generated_figures/
